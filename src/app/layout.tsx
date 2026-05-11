@@ -22,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/providers" className="hover:text-ink">Provider roster</Link>
               <Link href="/engagement" className="hover:text-ink">Engagement queue</Link>
               <Link href="/ecds-report" className="hover:text-ink">ECDS report</Link>
+              <Link href="/provider/connect" className="hover:text-ink">Provider portal</Link>
               <Link href="/chat" className="hover:text-ink">Agent chat</Link>
             </nav>
           </div>

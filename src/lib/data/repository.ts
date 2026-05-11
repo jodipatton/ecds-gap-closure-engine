@@ -1,6 +1,15 @@
-// Repository layer. JSON-file backed by default, swappable for Firestore.
-// All reads/writes funnel through these collections so a Firestore adapter
-// implementing the same interfaces can drop in without touching engine code.
+// Repository layer. Picks one of two backends at module init:
+//
+//   - **Vercel KV** (when KV_REST_API_URL is in the environment, set
+//     automatically when you provision Vercel KV / Upstash Redis in the
+//     Vercel dashboard). Each collection is stored as one JSON-array value
+//     under a single key. Works inside Vercel's read-only serverless runtime.
+//
+//   - **JSON file** fallback (default for local dev). Same on-disk layout
+//     as before: one file per collection under data/store/.
+//
+// The same `CollectionRepo<T>` interface is exposed either way so the engine,
+// seed, UI, and agent tools never need to know which backend is active.
 
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -8,6 +17,7 @@ import type {
   Claim,
   Condition,
   DocumentReference,
+  EhrConnection,
   EngagementQueueEntry,
   HedisResult,
   MeasureGap,
@@ -19,13 +29,26 @@ import type {
   SeedSummary
 } from './types';
 
+export type Backend = 'kv' | 'json';
+
+const BACKEND: Backend = process.env.KV_REST_API_URL ? 'kv' : 'json';
+
+export interface CollectionRepo<T> {
+  list(): Promise<T[]>;
+  put(items: T[]): Promise<void>;
+  upsertOne(item: T, key: keyof T): Promise<void>;
+  clear(): Promise<void>;
+}
+
+// ---- JSON file backend ----------------------------------------------------
+
 const STORE_DIR = path.join(process.cwd(), 'data', 'store');
 
 async function ensureStore() {
   await fs.mkdir(STORE_DIR, { recursive: true });
 }
 
-async function readJson<T>(file: string, fallback: T): Promise<T> {
+async function readJsonFile<T>(file: string, fallback: T): Promise<T> {
   await ensureStore();
   const p = path.join(STORE_DIR, file);
   try {
@@ -37,7 +60,7 @@ async function readJson<T>(file: string, fallback: T): Promise<T> {
   }
 }
 
-async function writeJson(file: string, data: unknown): Promise<void> {
+async function writeJsonFile(file: string, data: unknown): Promise<void> {
   await ensureStore();
   const p = path.join(STORE_DIR, file);
   const tmp = `${p}.tmp`;
@@ -45,50 +68,112 @@ async function writeJson(file: string, data: unknown): Promise<void> {
   await fs.rename(tmp, p);
 }
 
-export interface CollectionRepo<T> {
-  list(): Promise<T[]>;
-  put(items: T[]): Promise<void>;
-  upsertOne(item: T, key: keyof T): Promise<void>;
-  clear(): Promise<void>;
-}
-
-function makeRepo<T>(file: string): CollectionRepo<T> {
+function makeJsonRepo<T>(collection: string): CollectionRepo<T> {
+  const file = `${collection}.json`;
   return {
-    list: () => readJson<T[]>(file, []),
-    put: (items) => writeJson(file, items),
+    list: () => readJsonFile<T[]>(file, []),
+    put: (items) => writeJsonFile(file, items),
     async upsertOne(item, key) {
-      const items = await readJson<T[]>(file, []);
+      const items = await readJsonFile<T[]>(file, []);
       const idx = items.findIndex((x) => (x as any)[key] === (item as any)[key]);
       if (idx >= 0) items[idx] = item;
       else items.push(item);
-      await writeJson(file, items);
+      await writeJsonFile(file, items);
     },
-    clear: () => writeJson(file, [])
+    clear: () => writeJsonFile(file, [])
   };
 }
 
+// ---- Vercel KV backend ----------------------------------------------------
+
+// Lazy-import so the JSON path works in environments where @vercel/kv isn't
+// installed (e.g. ad-hoc node scripts without npm install).
+let _kv: any = null;
+async function kvClient() {
+  if (_kv) return _kv;
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const mod = await import('@vercel/kv');
+  _kv = mod.kv;
+  return _kv;
+}
+
+function kvKey(collection: string) {
+  return `ecds:${collection}`;
+}
+
+function makeKvRepo<T>(collection: string): CollectionRepo<T> {
+  const key = kvKey(collection);
+  return {
+    async list() {
+      const kv = await kvClient();
+      const val = (await kv.get(key)) as T[] | null;
+      return val ?? [];
+    },
+    async put(items) {
+      const kv = await kvClient();
+      await kv.set(key, items);
+    },
+    async upsertOne(item, k) {
+      const kv = await kvClient();
+      const items = ((await kv.get(key)) as T[] | null) ?? [];
+      const idx = items.findIndex((x: any) => x[k] === (item as any)[k]);
+      if (idx >= 0) items[idx] = item;
+      else items.push(item);
+      await kv.set(key, items);
+    },
+    async clear() {
+      const kv = await kvClient();
+      await kv.set(key, []);
+    }
+  };
+}
+
+// ---- Public registry ------------------------------------------------------
+
+const make = BACKEND === 'kv' ? makeKvRepo : makeJsonRepo;
+
 export const repos = {
-  members: makeRepo<Member>('members.json'),
-  claims: makeRepo<Claim>('claims.json'),
-  attribution: makeRepo<MemberAttribution>('memberAttribution.json'),
-  providers: makeRepo<ProviderOrg>('providerDirectory.json'),
-  observations: makeRepo<Observation>('observations.json'),
-  conditions: makeRepo<Condition>('conditions.json'),
-  medications: makeRepo<MedicationRequest>('medications.json'),
-  documents: makeRepo<DocumentReference>('documents.json'),
-  hedisResults: makeRepo<HedisResult>('hedisResults.json'),
-  gaps: makeRepo<MeasureGap>('gaps.json'),
-  engagement: makeRepo<EngagementQueueEntry>('engagementQueue.json')
+  members: make<Member>('members'),
+  claims: make<Claim>('claims'),
+  attribution: make<MemberAttribution>('memberAttribution'),
+  providers: make<ProviderOrg>('providerDirectory'),
+  observations: make<Observation>('observations'),
+  conditions: make<Condition>('conditions'),
+  medications: make<MedicationRequest>('medications'),
+  documents: make<DocumentReference>('documents'),
+  hedisResults: make<HedisResult>('hedisResults'),
+  gaps: make<MeasureGap>('gaps'),
+  engagement: make<EngagementQueueEntry>('engagementQueue'),
+  ehrConnections: make<EhrConnection>('ehrConnections')
 };
 
+// ---- Seed summary (single object, not a collection) -----------------------
+
+const SEED_SUMMARY_FILE = 'seedSummary.json';
+const SEED_SUMMARY_KV_KEY = 'ecds:seedSummary';
+
 export async function readSeedSummary(): Promise<SeedSummary | null> {
-  return readJson<SeedSummary | null>('seedSummary.json', null);
+  if (BACKEND === 'kv') {
+    const kv = await kvClient();
+    const val = (await kv.get(SEED_SUMMARY_KV_KEY)) as SeedSummary | null;
+    return val ?? null;
+  }
+  return readJsonFile<SeedSummary | null>(SEED_SUMMARY_FILE, null);
 }
 
 export async function writeSeedSummary(s: SeedSummary): Promise<void> {
-  await writeJson('seedSummary.json', s);
+  if (BACKEND === 'kv') {
+    const kv = await kvClient();
+    await kv.set(SEED_SUMMARY_KV_KEY, s);
+    return;
+  }
+  await writeJsonFile(SEED_SUMMARY_FILE, s);
 }
 
 export async function isSeeded(): Promise<boolean> {
   return (await readSeedSummary()) !== null;
+}
+
+export function activeBackend(): Backend {
+  return BACKEND;
 }

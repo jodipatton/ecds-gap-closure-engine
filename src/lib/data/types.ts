@@ -213,3 +213,31 @@ export interface SeedSummary {
   generatedAt: ISODate;
   measurementYear: number;
 }
+
+// ---- EHR connection (provider portal) ------------------------------------
+
+export type ConnectionType = 'epic-backend' | 'athena-fhir' | 'smart-on-fhir-generic';
+export type AuthMethod = 'jwt-backend-services' | 'oauth2-client-credentials' | 'smart-launch';
+export type ConnectionStatus = 'active' | 'expired' | 'error' | 'pending-setup';
+
+export interface EhrConnection {
+  providerNpi: string;
+  organizationName: string;
+  ehrPlatform: string;
+  connectionType: ConnectionType;
+  fhirBaseUrl: string;
+  authMethod: AuthMethod;
+  clientId: string;
+  publicKeyId: string | null; // Epic JWK kid reference
+  tokenEndpoint: string;
+  lastTokenRefresh: ISODate | null;
+  connectionStatus: ConnectionStatus;
+  lastSuccessfulSync: ISODate | null;
+  totalRecordsSynced: number;
+  supportedResources: string[];
+  scopesGranted: string[];
+  setupCompletedAt: ISODate | null;
+  setupCompletedBy: string | null;
+  // Diagnostic detail rendered in the status dashboard
+  lastErrorMessage?: string | null;
+}

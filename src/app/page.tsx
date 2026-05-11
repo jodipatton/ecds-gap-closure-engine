@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { repos, readSeedSummary } from '@/lib/data/repository';
+import { activeBackend, repos, readSeedSummary } from '@/lib/data/repository';
 import { Card, Pill, ProgressBar, StatTile, TierBadge } from '@/components/ui';
 import { SeedAndRun } from '@/components/SeedAndRun';
 import { ehrPlatformGapImpact } from '@/lib/hedis/engine';
@@ -7,6 +7,9 @@ import { ehrPlatformGapImpact } from '@/lib/hedis/engine';
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
+  const onVercel = process.env.VERCEL === '1';
+  const backend = activeBackend();
+  const needsKvProvisioning = onVercel && backend === 'json';
   const [summary, results, gaps, engagement, ehrImpact] = await Promise.all([
     readSeedSummary(),
     repos.hedisResults.list(),
@@ -37,6 +40,18 @@ export default async function Home() {
           clinical-data tiers.
         </p>
         <SeedAndRun seeded={seeded} hasResults={hasResults} />
+        {needsKvProvisioning && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <strong>Storage not provisioned.</strong> This deployment is running on Vercel without a KV
+            backend, so Seed and Run Engine will not persist between requests. In the Vercel dashboard
+            open <code className="bg-amber-100 px-1 rounded">Storage</code>, create an Upstash Redis (KV)
+            store, attach it to this project, and redeploy. The app auto-detects KV via the{' '}
+            <code className="bg-amber-100 px-1 rounded">KV_REST_API_URL</code> environment variable.
+          </div>
+        )}
+        {onVercel && backend === 'kv' && (
+          <div className="text-xs text-slate-500">Connected to Vercel KV.</div>
+        )}
       </section>
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
