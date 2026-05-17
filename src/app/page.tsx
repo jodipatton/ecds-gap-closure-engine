@@ -200,10 +200,18 @@ export default async function Home() {
 
       {/* Headline KPIs */}
       <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatTile label="Overall rate" value={hasResults ? `${overallRate.toFixed(1)}%` : '—'} hint="numerator / eligible" />
-        <StatTile label="Open gaps" value={totalGaps} hint={hasResults ? `${results.length} measures` : 'Run analytics'} />
-        <StatTile label="RAF recapture" value={`$${risk.totalRevenueOpportunity.toLocaleString()}`} hint={`${risk.membersWithSuspectedGap} members`} />
-        <StatTile label="VBC value at stake" value={contractValues.length ? `$${contractValueAtStake.toLocaleString()}` : '—'} hint={`${contractValues.length} contracts`} />
+        <Link href="/measures" className="block transition hover:opacity-90">
+          <StatTile label="Overall rate" value={hasResults ? `${overallRate.toFixed(1)}%` : '—'} hint="numerator / eligible" />
+        </Link>
+        <Link href="/measures" className="block transition hover:opacity-90">
+          <StatTile label="Open gaps" value={totalGaps} hint={hasResults ? `${results.length} measures` : 'Run analytics'} />
+        </Link>
+        <Link href="/risk" className="block transition hover:opacity-90">
+          <StatTile label="RAF recapture" value={`$${risk.totalRevenueOpportunity.toLocaleString()}`} hint={`${risk.membersWithSuspectedGap} members`} />
+        </Link>
+        <Link href="/contracts" className="block transition hover:opacity-90">
+          <StatTile label="VBC value at stake" value={contractValues.length ? `$${contractValueAtStake.toLocaleString()}` : '—'} hint={`${contractValues.length} contracts`} />
+        </Link>
       </section>
 
       {/* Cross-platform snapshot */}
@@ -265,14 +273,19 @@ export default async function Home() {
               <h2 className="text-lg font-semibold">Top dollar opportunities</h2>
               <Link href="/analytics" className="text-sm text-accent hover:underline">Model it →</Link>
             </div>
-            <ol className="space-y-2 text-sm">
+            <ol className="space-y-1 text-sm">
               {dollarRanked.map((r) => (
-                <li key={r.measureId} className="flex items-center justify-between gap-3">
-                  <Link href={`/measures/${r.measureId}`} className="hover:underline">{r.measureName}</Link>
-                  <span className="text-slate-700">
-                    ${r.impact.toLocaleString()}{' '}
-                    <span className="text-slate-400">({r.gapCount})</span>
-                  </span>
+                <li key={r.measureId}>
+                  <Link
+                    href={`/measures/${r.measureId}`}
+                    className="flex items-center justify-between gap-3 rounded-md px-2 py-1 hover:bg-slate-50"
+                  >
+                    <span>{r.measureName}</span>
+                    <span className="text-slate-700">
+                      ${r.impact.toLocaleString()}{' '}
+                      <span className="text-slate-400">({r.gapCount})</span>
+                    </span>
+                  </Link>
                 </li>
               ))}
             </ol>
@@ -282,18 +295,21 @@ export default async function Home() {
               <h2 className="text-lg font-semibold">Recommended actions</h2>
               <Link href="/chat" className="text-sm text-accent hover:underline">Ask why →</Link>
             </div>
-            <ol className="space-y-3">
+            <ol className="space-y-1">
               {actions.map((a, i) => (
-                <li key={i} className="flex items-start justify-between gap-4">
-                  <div>
-                    <Link href={a.href} className="text-sm font-medium text-ink hover:underline">
-                      {a.title}
-                    </Link>
-                    <div className="mt-0.5 max-w-md text-xs text-slate-500">{a.detail}</div>
-                  </div>
-                  <span className="whitespace-nowrap text-sm font-semibold text-slate-700">
-                    ${a.estimatedValue.toLocaleString()}
-                  </span>
+                <li key={i}>
+                  <Link
+                    href={a.href}
+                    className="flex items-start justify-between gap-4 rounded-md px-2 py-1.5 hover:bg-slate-50"
+                  >
+                    <span>
+                      <span className="text-sm font-medium text-ink">{a.title}</span>
+                      <span className="mt-0.5 block max-w-md text-xs text-slate-500">{a.detail}</span>
+                    </span>
+                    <span className="whitespace-nowrap text-sm font-semibold text-slate-700">
+                      ${a.estimatedValue.toLocaleString()}
+                    </span>
+                  </Link>
                 </li>
               ))}
               {actions.length === 0 && <li className="text-sm text-slate-500">Run analytics to populate.</li>}
@@ -310,9 +326,13 @@ export default async function Home() {
               <h2 className="text-lg font-semibold">Open-gap impact by EHR platform</h2>
               <Link href="/providers" className="text-sm text-accent hover:underline">Provider roster →</Link>
             </div>
-            <div className="grid gap-2 text-sm sm:grid-cols-2">
+            <div className="grid gap-1 text-sm sm:grid-cols-2">
               {ehrImpact.map((row) => (
-                <div key={row.platform} className="flex items-center justify-between gap-3">
+                <Link
+                  key={row.platform}
+                  href="/providers"
+                  className="flex items-center justify-between gap-3 rounded-md px-2 py-1 hover:bg-slate-50"
+                >
                   <span className="flex items-center gap-2">
                     <span className="font-medium">{row.platform}</span>
                     <Pill color={row.platform === 'No PCP' || row.platform === 'Unconnected' ? 'rose' : 'sky'}>
@@ -322,7 +342,7 @@ export default async function Home() {
                   <span className="text-slate-700">
                     {row.openGaps} gaps · <span className="text-slate-500">{row.sharePct}%</span>
                   </span>
-                </div>
+                </Link>
               ))}
               {ehrImpact.length === 0 && <div className="text-slate-500">No data yet.</div>}
             </div>
