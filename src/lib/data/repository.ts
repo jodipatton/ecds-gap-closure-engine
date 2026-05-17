@@ -161,6 +161,10 @@ async function fsDb() {
     admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
   }
   _fsDb = admin.firestore();
+  // The engine emits optional fields (e.g. MeasureGap.missingDataElement) as
+  // `undefined` on closed gaps; Firestore rejects undefined unless told to
+  // skip it. settings() must run once before any operation.
+  _fsDb.settings({ ignoreUndefinedProperties: true });
   return _fsDb;
 }
 
