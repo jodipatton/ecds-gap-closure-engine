@@ -14,6 +14,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import type {
+  AuditEvent,
   Campaign,
   Claim,
   Condition,
@@ -28,7 +29,8 @@ import type {
   Observation,
   PayerAccessGrant,
   ProviderOrg,
-  SeedSummary
+  SeedSummary,
+  ValueContract
 } from './types';
 
 export type Backend = 'firestore' | 'kv' | 'json';
@@ -232,7 +234,9 @@ export const repos = {
   engagement: make<EngagementQueueEntry>('engagementQueue'),
   ehrConnections: make<EhrConnection>('ehrConnections'),
   campaigns: make<Campaign>('campaigns'),
-  payerAccess: make<PayerAccessGrant>('payerAccess')
+  payerAccess: make<PayerAccessGrant>('payerAccess'),
+  auditEvents: make<AuditEvent>('auditEvents'),
+  contracts: make<ValueContract>('valueContracts')
 };
 
 // ---- Seed summary (single object, not a collection) -----------------------

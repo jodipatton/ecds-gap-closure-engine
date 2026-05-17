@@ -5,6 +5,7 @@
 // the substantive parts modeled here.
 
 import { repos } from '@/lib/data/repository';
+import { recordAudit } from '@/lib/audit/audit';
 import type { PayerAccessGrant } from '@/lib/data/types';
 
 const PAYER_FHIR_BASE = 'https://api.healthplan-demo.example.com/provider-access/fhir/r4';
@@ -87,5 +88,19 @@ export async function testPayerAccess(providerNpi: string): Promise<PayerAccessG
     lastErrorMessage: null
   };
   await repos.payerAccess.upsertOne(updated, 'providerNpi');
+
+  await recordAudit({
+    source: 'payer-access-pull',
+    sourceSystem: 'CMS Provider Access API',
+    providerNpi: grant.providerNpi,
+    organizationName: grant.organizationName,
+    resourceCounts: { Patient: panel },
+    recordsAccepted: panel,
+    recordsRejected: 0,
+    psvStatus: 'verified',
+    psvBasis: 'Attested treatment relationship (CMS-0057-F) for attributed panel',
+    initiatedBy: 'provider portal · Payer Access API'
+  });
+
   return updated;
 }

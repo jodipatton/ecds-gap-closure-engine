@@ -8,9 +8,13 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: '#0F172A',
-        paper: '#F8FAFC',
-        accent: '#0EA5E9',
+        // 1upHealth-inspired palette (demo approximation, not official assets)
+        ink: '#0B1B3F', // deep navy — sidebar, headings
+        paper: '#F5F8FC',
+        accent: '#1F6FEB', // 1up vivid blue — buttons, links, active
+        brand: '#1F6FEB',
+        brandNavy: '#0B1B3F',
+        brandAccent: '#16C098', // teal accent
         warn: '#F59E0B',
         bad: '#EF4444',
         good: '#10B981'

@@ -10,6 +10,7 @@
 
 import { repos, readSeedSummary } from '@/lib/data/repository';
 import { runEngine } from '@/lib/hedis/engine';
+import { recordAudit, psvFor } from '@/lib/audit/audit';
 import type {
   Condition,
   DocumentReference,
@@ -212,6 +213,26 @@ export async function syncProviderClinicalData(npi: string): Promise<SyncResult>
       'providerNpi'
     );
   }
+
+  // Provenance / PSV audit entry for the acquisition.
+  const psv = psvFor(provider);
+  await recordAudit({
+    source: 'ehr-sync',
+    sourceSystem: `${provider.ehrPlatform ?? 'SMART'} FHIR R4`,
+    providerNpi: provider.npi,
+    organizationName: provider.organizationName,
+    resourceCounts: {
+      Observation: add.observations.length,
+      Condition: add.conditions.length,
+      MedicationRequest: add.medications.length,
+      DocumentReference: add.documents.length
+    },
+    recordsAccepted: recordsSynced,
+    recordsRejected: 0,
+    psvStatus: psv.psvStatus,
+    psvBasis: psv.psvBasis,
+    initiatedBy: 'provider portal · EHR sync'
+  });
 
   // Re-run the engine so gap/rate impact is real.
   await runEngine({ measurementYear: my });

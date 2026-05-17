@@ -15,6 +15,7 @@ export default function ProviderLayout({ children }: { children: React.ReactNode
           <Link href="/provider/connect" className="hover:text-ink">EHR Connect</Link>
           <Link href="/provider/connect/status" className="hover:text-ink">Status</Link>
           <Link href="/provider/payer-access" className="hover:text-ink">Payer Access API</Link>
+          <Link href="/provider/contract" className="hover:text-ink">My Contract</Link>
           <Link href="/" className="hover:text-ink">← Plan dashboard</Link>
         </div>
       </nav>

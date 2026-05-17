@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { OneUpWordmark } from '@/components/brand';
 
 interface NavItem {
   href: string;
@@ -12,6 +13,10 @@ interface NavItem {
 
 const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
   {
+    title: 'Assistant',
+    items: [{ href: '/chat', label: 'Ask the assistant' }]
+  },
+  {
     title: 'Plan',
     items: [
       { href: '/', label: 'Dashboard', exact: true },
@@ -19,6 +24,8 @@ const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
       { href: '/analytics', label: 'Analytics' },
       { href: '/risk', label: 'Risk (RAF)' },
       { href: '/rosters', label: 'Rosters' },
+      { href: '/contracts', label: 'Value-based contracts' },
+      { href: '/audit', label: 'PSV audit trail' },
       { href: '/providers', label: 'Provider roster' }
     ]
   },
@@ -31,11 +38,8 @@ const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
     ]
   },
   {
-    title: 'Provider',
-    items: [
-      { href: '/provider/connect', label: 'Provider portal' },
-      { href: '/chat', label: 'Agent chat' }
-    ]
+    title: 'Provider portal',
+    items: [{ href: '/provider/connect', label: 'Provider portal' }]
   }
 ];
 
@@ -51,9 +55,9 @@ export function Sidebar() {
     <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col bg-ink text-slate-300">
       <div className="flex items-center gap-2 px-5 py-5">
         <span className="grid h-7 w-7 place-items-center rounded-md bg-accent text-sm font-bold text-white">
-          ◆
+          1↑
         </span>
-        <span className="text-sm font-semibold text-white">ECDS Gap Engine</span>
+        <OneUpWordmark variant="dark" />
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-6">

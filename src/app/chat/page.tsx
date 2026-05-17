@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui';
 
 interface Msg {
@@ -12,9 +12,10 @@ interface Msg {
 
 const SUGGESTIONS = [
   'Which measures have the most open gaps?',
+  'What is our RAF recapture opportunity?',
+  'Show the value at stake in our VBC contracts',
+  'Generate a payer roster',
   'What is the gap-closure impact if we connect to Epic?',
-  'Tell me about HBD.',
-  'Who is missing clinical data for HBD?',
   'Summarize the engagement queue.'
 ];
 
@@ -22,6 +23,18 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const autoSent = useRef(false);
+
+  // Onboarding: a ?q= from the dashboard hero auto-asks the question.
+  useEffect(() => {
+    if (autoSent.current) return;
+    const q = new URLSearchParams(window.location.search).get('q');
+    if (q) {
+      autoSent.current = true;
+      send(q);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function send(text: string) {
     if (!text.trim() || busy) return;
@@ -55,12 +68,13 @@ export default function ChatPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold">Agent chat</h1>
+        <h1 className="text-2xl font-semibold">1upHealth assistant</h1>
         <p className="text-sm text-slate-600 mt-1 max-w-3xl">
-          Ask grounded questions about measures, gaps, the engagement queue, and EHR-platform impact.
-          With <code className="text-xs bg-slate-100 px-1 rounded">OPENAI_API_KEY</code> set, the agent uses
-          OpenAI tool calling against the engine. Without it, it falls back to a deterministic tool router
-          so the demo still works.
+          Ask grounded questions about measures, gaps, risk (RAF), value-based contracts, rosters,
+          and the engagement queue. With{' '}
+          <code className="text-xs bg-slate-100 px-1 rounded">OPENAI_API_KEY</code> set, the
+          assistant uses OpenAI tool calling against the engine; without it, a deterministic tool
+          router keeps the demo working.
         </p>
       </div>
 

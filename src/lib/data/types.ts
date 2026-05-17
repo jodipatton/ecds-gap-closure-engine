@@ -255,6 +255,45 @@ export interface CampaignMember {
   lastTouchedAt: ISODate | null;
 }
 
+// ---- Clinical data provenance / PSV audit trail ---------------------------
+
+export type AuditSource = 'ehr-sync' | 'payer-access-pull' | 'seed';
+
+export interface AuditEvent {
+  id: string;
+  ts: ISODate;
+  source: AuditSource;
+  sourceSystem: string; // e.g. "Epic FHIR R4", "Provider Access API"
+  providerNpi: string | null;
+  organizationName: string | null;
+  resourceCounts: Record<string, number>; // { Observation: 5, Condition: 2, ... }
+  recordsAccepted: number;
+  recordsRejected: number;
+  // Primary Source Verification: was the source a validated, attributed origin?
+  psvStatus: 'verified' | 'unverified';
+  psvBasis: string;
+  initiatedBy: string;
+}
+
+// ---- Value-based contracts ------------------------------------------------
+
+export type VbcModel = 'P4P' | 'Shared Savings' | 'Full Risk';
+
+export interface ValueContract {
+  id: string;
+  providerNpi: string;
+  organizationName: string;
+  payerName: string;
+  model: VbcModel;
+  measureIds: string[];
+  panelSize: number;
+  targetRatePct: number;
+  perGapIncentive: number; // $ earned per closed gap
+  qualityWithholdPct: number; // % of capitation at risk on quality
+  estimatedCapitation: number; // annual $, illustrative
+  effectiveYear: number;
+}
+
 // ---- CMS Provider Access API onboarding (CMS-0057-F) ----------------------
 
 export type PayerAccessStatus = 'pending' | 'attested' | 'connected' | 'error';

@@ -34,6 +34,43 @@ export default async function Home() {
 
   return (
     <div className="space-y-8">
+      <section className="rounded-xl bg-ink p-6 text-white">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="max-w-xl">
+            <div className="text-xs font-semibold uppercase tracking-wider text-sky-300">
+              Start here
+            </div>
+            <h2 className="mt-1 text-xl font-semibold">Ask the 1upHealth assistant</h2>
+            <p className="mt-1 text-sm text-slate-300">
+              New here? Skip the menus — ask in plain language and the assistant answers from live
+              engine data (measures, gaps, risk, contracts, rosters).
+            </p>
+          </div>
+          <Link
+            href="/chat"
+            className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+          >
+            Open assistant →
+          </Link>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {[
+            'Which measures have the most open gaps?',
+            'What is our RAF recapture opportunity?',
+            'Show the value at stake in our VBC contracts',
+            'Generate a payer roster'
+          ].map((q) => (
+            <Link
+              key={q}
+              href={`/chat?q=${encodeURIComponent(q)}`}
+              className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-slate-200 hover:bg-white/10"
+            >
+              {q}
+            </Link>
+          ))}
+        </div>
+      </section>
+
       <section className="space-y-3">
         <h1 className="text-2xl font-semibold text-ink">Plan-wide quality posture</h1>
         <p className="text-sm text-slate-600 max-w-3xl">
