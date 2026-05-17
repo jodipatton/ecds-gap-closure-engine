@@ -41,7 +41,7 @@ export function SeedAndRun({ seeded, hasResults }: { seeded: boolean; hasResults
         disabled={busy !== null || !seeded}
         className="rounded bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
-        {busy === 'engine' ? 'Running engine…' : hasResults ? 'Re-run ECDS engine' : 'Run ECDS engine'}
+        {busy === 'engine' ? 'Running analytics…' : hasResults ? 'Re-run Analytics' : 'Run Analytics'}
       </button>
       {!seeded && <span className="text-xs text-slate-500">Seed first to enable the engine.</span>}
       {(msg || isPending) && <span className="text-xs text-slate-600">{msg ?? 'Refreshing…'}</span>}
