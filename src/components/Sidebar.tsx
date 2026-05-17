@@ -40,6 +40,10 @@ const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
   {
     title: 'Provider portal',
     items: [{ href: '/provider', label: 'Provider portal' }]
+  },
+  {
+    title: 'Internal · 1upHealth',
+    items: [{ href: '/internal/feedback', label: 'Feedback' }]
   }
 ];
 
