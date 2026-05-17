@@ -4,6 +4,9 @@
 import { repos } from '@/lib/data/repository';
 import { ehrPlatformGapImpact } from '@/lib/hedis/engine';
 import { MEASURES, getMeasure } from '@/lib/hedis/measures';
+import { recommendedActions } from './recommendations';
+import { simulateMeasure } from '@/lib/analytics/projection';
+import { buildCareGapLetter } from '@/lib/outreach/letter';
 
 export interface ToolDef {
   name: string;
@@ -133,6 +136,84 @@ export const tools: ToolDef[] = [
         domain: spec.domain,
         dataTier: spec.dataTier,
         description: spec.description
+      };
+    }
+  },
+  {
+    name: 'recommended_actions',
+    description: 'Rank the highest-value next actions for the quality team (measure outreach, EHR connection, queue engagement) with illustrative dollar value.',
+    parameters: {
+      type: 'object',
+      properties: { limit: { type: 'integer', minimum: 1, maximum: 10, default: 5 } },
+      additionalProperties: false
+    },
+    async execute({ limit = 5 }) {
+      return await recommendedActions(limit);
+    }
+  },
+  {
+    name: 'simulate_gap_closure',
+    description: 'Project a measure\'s rate and illustrative dollars captured if a given number of its open gaps were closed.',
+    parameters: {
+      type: 'object',
+      properties: {
+        measureId: { type: 'string' },
+        closeCount: { type: 'integer', minimum: 0 }
+      },
+      required: ['measureId', 'closeCount'],
+      additionalProperties: false
+    },
+    async execute({ measureId, closeCount }) {
+      const results = await repos.hedisResults.list();
+      const r = results.find((x) => x.measureId.toUpperCase() === String(measureId).toUpperCase());
+      if (!r) return { error: `No result for ${measureId}. Run the engine first.` };
+      return { measureId: r.measureId, currentRate: r.rate, openGaps: r.gapCount, ...simulateMeasure(r, Number(closeCount)) };
+    }
+  },
+  {
+    name: 'care_gap_letter',
+    description: 'Generate a member-facing care-gap outreach letter for a member and measure.',
+    parameters: {
+      type: 'object',
+      properties: { memberId: { type: 'string' }, measureId: { type: 'string' } },
+      required: ['memberId', 'measureId'],
+      additionalProperties: false
+    },
+    async execute({ memberId, measureId }) {
+      return await buildCareGapLetter(String(memberId), String(measureId));
+    }
+  },
+  {
+    name: 'member_360',
+    description: 'Return a 360 view of one member: demographics, attribution, open gaps, and clinical-data footprint.',
+    parameters: {
+      type: 'object',
+      properties: { memberId: { type: 'string' } },
+      required: ['memberId'],
+      additionalProperties: false
+    },
+    async execute({ memberId }) {
+      const id = String(memberId);
+      const [members, attribution, gaps, claims, obs, cond, rx, docs] = await Promise.all([
+        repos.members.list(), repos.attribution.list(), repos.gaps.list(),
+        repos.claims.list(), repos.observations.list(), repos.conditions.list(),
+        repos.medications.list(), repos.documents.list()
+      ]);
+      const member = members.find((m) => m.id === id);
+      if (!member) return { error: `Member ${id} not found` };
+      const memberGaps = gaps.filter((g) => g.memberId === id);
+      return {
+        member,
+        attribution: attribution.find((a) => a.memberId === id) ?? null,
+        openGaps: memberGaps.filter((g) => g.status.startsWith('open-')).map((g) => ({ measureId: g.measureId, status: g.status, missingDataElement: g.missingDataElement })),
+        closedGaps: memberGaps.filter((g) => g.status.startsWith('closed-')).map((g) => g.measureId),
+        clinicalFootprint: {
+          claims: claims.filter((c) => c.memberId === id).length,
+          observations: obs.filter((o) => o.memberId === id).length,
+          conditions: cond.filter((c) => c.memberId === id).length,
+          medications: rx.filter((m) => m.memberId === id).length,
+          documents: docs.filter((d) => d.memberId === id).length
+        }
       };
     }
   }

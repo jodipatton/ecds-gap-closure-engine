@@ -8,3 +8,6 @@ out
 data/store/*.json
 !data/store/.gitkeep
 .vercel
+
+# build info
+tsconfig.tsbuildinfo

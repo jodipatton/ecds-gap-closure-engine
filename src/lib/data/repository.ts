@@ -14,6 +14,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import type {
+  Campaign,
   Claim,
   Condition,
   DocumentReference,
@@ -29,9 +30,15 @@ import type {
   SeedSummary
 } from './types';
 
-export type Backend = 'kv' | 'json';
+export type Backend = 'firestore' | 'kv' | 'json';
 
-const BACKEND: Backend = process.env.KV_REST_API_URL ? 'kv' : 'json';
+// Backend precedence: Firestore (a service-account credential is present) →
+// Vercel KV → local JSON file. Local dev with no creds stays on JSON.
+const BACKEND: Backend = process.env.FIREBASE_SERVICE_ACCOUNT
+  ? 'firestore'
+  : process.env.KV_REST_API_URL
+    ? 'kv'
+    : 'json';
 
 export interface CollectionRepo<T> {
   list(): Promise<T[]>;
@@ -128,9 +135,71 @@ function makeKvRepo<T>(collection: string): CollectionRepo<T> {
   };
 }
 
+// ---- Firestore backend ----------------------------------------------------
+
+// Mirrors the KV layout: each collection is one Firestore document whose
+// `data` field holds the whole array. This keeps list/put/upsertOne/clear
+// semantics identical to the other backends. (Firestore caps a document at
+// 1 MiB; the demo's largest collection — claims for ~120 members — is well
+// under that. Move to per-document storage if seeds grow much larger.)
+
+const FS_COLLECTION = 'ecds_store';
+
+let _fsDb: any = null;
+async function fsDb() {
+  if (_fsDb) return _fsDb;
+  // firebase-admin is CJS; normalize the dynamic-import interop shape.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const mod: any = await import('firebase-admin');
+  const admin: any = mod.default ?? mod;
+  if (admin.apps.length === 0) {
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT ?? '';
+    const json = raw.trim().startsWith('{')
+      ? raw
+      : Buffer.from(raw, 'base64').toString('utf-8');
+    const serviceAccount = JSON.parse(json);
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+  }
+  _fsDb = admin.firestore();
+  return _fsDb;
+}
+
+async function fsRead<T>(docId: string, fallback: T): Promise<T> {
+  const db = await fsDb();
+  const snap = await db.collection(FS_COLLECTION).doc(docId).get();
+  if (!snap.exists) return fallback;
+  const val = snap.data()?.data;
+  return (val ?? fallback) as T;
+}
+
+async function fsWrite(docId: string, data: unknown): Promise<void> {
+  const db = await fsDb();
+  await db.collection(FS_COLLECTION).doc(docId).set({ data, updatedAt: Date.now() });
+}
+
+function makeFirestoreRepo<T>(collection: string): CollectionRepo<T> {
+  return {
+    list: () => fsRead<T[]>(collection, []),
+    put: (items) => fsWrite(collection, items),
+    async upsertOne(item, key) {
+      const items = await fsRead<T[]>(collection, []);
+      const idx = items.findIndex((x) => (x as any)[key] === (item as any)[key]);
+      if (idx >= 0) items[idx] = item;
+      else items.push(item);
+      await fsWrite(collection, items);
+    },
+    clear: () => fsWrite(collection, [])
+  };
+}
+
 // ---- Public registry ------------------------------------------------------
 
-const make = BACKEND === 'kv' ? makeKvRepo : makeJsonRepo;
+const make =
+  BACKEND === 'firestore'
+    ? makeFirestoreRepo
+    : BACKEND === 'kv'
+      ? makeKvRepo
+      : makeJsonRepo;
 
 export const repos = {
   members: make<Member>('members'),
@@ -144,7 +213,8 @@ export const repos = {
   hedisResults: make<HedisResult>('hedisResults'),
   gaps: make<MeasureGap>('gaps'),
   engagement: make<EngagementQueueEntry>('engagementQueue'),
-  ehrConnections: make<EhrConnection>('ehrConnections')
+  ehrConnections: make<EhrConnection>('ehrConnections'),
+  campaigns: make<Campaign>('campaigns')
 };
 
 // ---- Seed summary (single object, not a collection) -----------------------
@@ -152,7 +222,12 @@ export const repos = {
 const SEED_SUMMARY_FILE = 'seedSummary.json';
 const SEED_SUMMARY_KV_KEY = 'ecds:seedSummary';
 
+const SEED_SUMMARY_FS_DOC = 'seedSummary';
+
 export async function readSeedSummary(): Promise<SeedSummary | null> {
+  if (BACKEND === 'firestore') {
+    return fsRead<SeedSummary | null>(SEED_SUMMARY_FS_DOC, null);
+  }
   if (BACKEND === 'kv') {
     const kv = await kvClient();
     const val = (await kv.get(SEED_SUMMARY_KV_KEY)) as SeedSummary | null;
@@ -162,6 +237,10 @@ export async function readSeedSummary(): Promise<SeedSummary | null> {
 }
 
 export async function writeSeedSummary(s: SeedSummary): Promise<void> {
+  if (BACKEND === 'firestore') {
+    await fsWrite(SEED_SUMMARY_FS_DOC, s);
+    return;
+  }
   if (BACKEND === 'kv') {
     const kv = await kvClient();
     await kv.set(SEED_SUMMARY_KV_KEY, s);

@@ -19,8 +19,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav className="flex items-center gap-5 text-sm text-slate-600">
               <Link href="/" className="hover:text-ink">Dashboard</Link>
               <Link href="/measures" className="hover:text-ink">Measures</Link>
+              <Link href="/analytics" className="hover:text-ink">Analytics</Link>
               <Link href="/providers" className="hover:text-ink">Provider roster</Link>
               <Link href="/engagement" className="hover:text-ink">Engagement queue</Link>
+              <Link href="/campaigns" className="hover:text-ink">Campaigns</Link>
               <Link href="/ecds-report" className="hover:text-ink">ECDS report</Link>
               <Link href="/provider/connect" className="hover:text-ink">Provider portal</Link>
               <Link href="/chat" className="hover:text-ink">Agent chat</Link>

@@ -3,6 +3,7 @@ import { activeBackend, repos, readSeedSummary } from '@/lib/data/repository';
 import { Card, Pill, ProgressBar, StatTile, TierBadge } from '@/components/ui';
 import { SeedAndRun } from '@/components/SeedAndRun';
 import { ehrPlatformGapImpact } from '@/lib/hedis/engine';
+import { recommendedActions } from '@/lib/agent/recommendations';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,12 +11,13 @@ export default async function Home() {
   const onVercel = process.env.VERCEL === '1';
   const backend = activeBackend();
   const needsKvProvisioning = onVercel && backend === 'json';
-  const [summary, results, gaps, engagement, ehrImpact] = await Promise.all([
+  const [summary, results, gaps, engagement, ehrImpact, actions] = await Promise.all([
     readSeedSummary(),
     repos.hedisResults.list(),
     repos.gaps.list(),
     repos.engagement.list(),
-    ehrPlatformGapImpact()
+    ehrPlatformGapImpact(),
+    recommendedActions(5)
   ]);
   const seeded = summary !== null;
   const hasResults = results.length > 0;
@@ -51,6 +53,9 @@ export default async function Home() {
         )}
         {onVercel && backend === 'kv' && (
           <div className="text-xs text-slate-500">Connected to Vercel KV.</div>
+        )}
+        {backend === 'firestore' && (
+          <div className="text-xs text-slate-500">Connected to Firebase Firestore.</div>
         )}
       </section>
 
@@ -133,6 +138,37 @@ export default async function Home() {
               ))}
               {ehrImpact.length === 0 && <li className="text-slate-500">No data yet.</li>}
             </ul>
+          </Card>
+        </section>
+      )}
+
+      {hasResults && actions.length > 0 && (
+        <section>
+          <Card>
+            <h2 className="text-lg font-semibold mb-1">Recommended actions</h2>
+            <p className="text-xs text-slate-500 mb-3">
+              Highest-value next steps, ranked by illustrative dollar opportunity.
+            </p>
+            <ol className="space-y-3">
+              {actions.map((a, i) => (
+                <li key={i} className="flex items-start justify-between gap-4">
+                  <div>
+                    <Link href={a.href} className="font-medium text-ink hover:underline">
+                      {a.title}
+                    </Link>
+                    <div className="text-xs text-slate-500 mt-0.5 max-w-2xl">{a.detail}</div>
+                  </div>
+                  <div className="text-right whitespace-nowrap">
+                    <div className="text-sm font-semibold text-slate-700">
+                      ${a.estimatedValue.toLocaleString()}
+                    </div>
+                    <Pill color={a.kind === 'ehr-connect' ? 'sky' : a.kind === 'measure' ? 'amber' : 'slate'}>
+                      {a.kind}
+                    </Pill>
+                  </div>
+                </li>
+              ))}
+            </ol>
           </Card>
         </section>
       )}

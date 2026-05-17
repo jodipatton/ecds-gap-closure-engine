@@ -241,3 +241,27 @@ export interface EhrConnection {
   // Diagnostic detail rendered in the status dashboard
   lastErrorMessage?: string | null;
 }
+
+// ---- Outreach campaigns ---------------------------------------------------
+
+export type ContactStatus = 'not-contacted' | 'contacted' | 'scheduled' | 'closed';
+
+export interface CampaignMember {
+  memberId: string;
+  memberName: string;
+  relatedMeasures: string[];
+  suggestedProviderName: string | null;
+  contactStatus: ContactStatus;
+  lastTouchedAt: ISODate | null;
+}
+
+export interface Campaign {
+  id: string;
+  name: string;
+  // What seeded this campaign's roster.
+  filterType: 'measure' | 'queue-reason';
+  filterValue: string;
+  channel: 'phone' | 'sms' | 'mail';
+  createdAt: ISODate;
+  members: CampaignMember[];
+}

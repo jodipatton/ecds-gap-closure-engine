@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { repos } from '@/lib/data/repository';
 import { Card, Pill } from '@/components/ui';
 import { ResyncButton } from '@/components/ehr/ResyncButton';
+import { ClinicalSyncButton } from '@/components/ehr/ClinicalSyncButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -137,6 +138,16 @@ export default async function ConnectionStatusPage({ searchParams }: { searchPar
                 </ul>
               </div>
             </div>
+          </Card>
+
+          <Card>
+            <h2 className="font-semibold text-ink">ECDS clinical-data pull</h2>
+            <p className="text-xs text-slate-500 mt-1 mb-3">
+              Fetches the FHIR Observations, Conditions, MedicationRequests, and DocumentReferences
+              this practice surfaces for its attributed members, then re-runs the ECDS engine and
+              reports the gaps closed.
+            </p>
+            <ClinicalSyncButton npi={provider.npi} />
           </Card>
 
           <Card>
