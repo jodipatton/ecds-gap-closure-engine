@@ -255,6 +255,27 @@ export interface CampaignMember {
   lastTouchedAt: ISODate | null;
 }
 
+// ---- CMS Provider Access API onboarding (CMS-0057-F) ----------------------
+
+export type PayerAccessStatus = 'pending' | 'attested' | 'connected' | 'error';
+
+export interface PayerAccessGrant {
+  providerNpi: string;
+  organizationName: string;
+  tin: string;
+  attestedTreatmentRelationship: boolean;
+  attestedMinimumNecessary: boolean;
+  clientId: string;
+  payerFhirBaseUrl: string;
+  tokenEndpoint: string;
+  scopesRequested: string[];
+  status: PayerAccessStatus;
+  attributedMemberCount: number;
+  lastPullAt: ISODate | null;
+  registeredAt: ISODate | null;
+  lastErrorMessage?: string | null;
+}
+
 export interface Campaign {
   id: string;
   name: string;

@@ -7,6 +7,9 @@ import { MEASURES, getMeasure } from '@/lib/hedis/measures';
 import { recommendedActions } from './recommendations';
 import { simulateMeasure } from '@/lib/analytics/projection';
 import { buildCareGapLetter } from '@/lib/outreach/letter';
+import { readSeedSummary } from '@/lib/data/repository';
+import { planRiskSummary } from '@/lib/risk/raf';
+import { buildRoster } from '@/lib/rosters/roster';
 
 export interface ToolDef {
   name: string;
@@ -215,6 +218,56 @@ export const tools: ToolDef[] = [
           documents: docs.filter((d) => d.memberId === id).length
         }
       };
+    }
+  },
+  {
+    name: 'risk_summary',
+    description: 'Plan-wide Medicare risk-adjustment (CMS-HCC / RAF) summary: average RAF, suspected-HCC recapture opportunity, and illustrative revenue.',
+    parameters: { type: 'object', properties: {}, additionalProperties: false },
+    async execute() {
+      const [members, conditions, claims, summary] = await Promise.all([
+        repos.members.list(), repos.conditions.list(), repos.claims.list(), readSeedSummary()
+      ]);
+      const r = planRiskSummary(members, conditions, claims, summary?.measurementYear ?? new Date().getFullYear());
+      const { members: _m, ...rest } = r;
+      return rest;
+    }
+  },
+  {
+    name: 'member_risk',
+    description: 'Per-member RAF detail: demographic factor, documented HCCs, suspected (recapturable) HCCs, and revenue opportunity.',
+    parameters: {
+      type: 'object',
+      properties: { memberId: { type: 'string' } },
+      required: ['memberId'],
+      additionalProperties: false
+    },
+    async execute({ memberId }) {
+      const [members, conditions, claims, summary] = await Promise.all([
+        repos.members.list(), repos.conditions.list(), repos.claims.list(), readSeedSummary()
+      ]);
+      const r = planRiskSummary(members, conditions, claims, summary?.measurementYear ?? new Date().getFullYear());
+      const found = r.members.find((m) => m.memberId === String(memberId));
+      return found ?? { error: `No member ${memberId}` };
+    }
+  },
+  {
+    name: 'generate_roster',
+    description: 'Generate an actionable roster (open gaps + suspected HCCs). audience "payer" spans the population; "provider" requires an NPI and is panel-scoped.',
+    parameters: {
+      type: 'object',
+      properties: {
+        audience: { type: 'string', enum: ['payer', 'provider'] },
+        npi: { type: 'string' },
+        limit: { type: 'integer', minimum: 1, maximum: 100, default: 25 }
+      },
+      required: ['audience'],
+      additionalProperties: false
+    },
+    async execute({ audience, npi, limit = 25 }) {
+      if (audience === 'provider' && !npi) return { error: 'npi is required for a provider roster' };
+      const result = await buildRoster(audience === 'provider' ? 'provider' : 'payer', npi);
+      return { ...result, rows: result.rows.slice(0, limit) };
     }
   }
 ];

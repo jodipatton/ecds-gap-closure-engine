@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { repos } from '@/lib/data/repository';
 import { Card, Pill } from '@/components/ui';
 import { ehrPlatformGapImpact } from '@/lib/hedis/engine';
@@ -66,7 +67,8 @@ export default async function ProvidersPage() {
                   <th className="py-2 pr-4">FHIR endpoint</th>
                   <th className="py-2 pr-4">HIE</th>
                   <th className="py-2 pr-4">Members</th>
-                  <th className="py-2">Open gaps</th>
+                  <th className="py-2 pr-4">Open gaps</th>
+                  <th className="py-2">Roster</th>
                 </tr>
               </thead>
               <tbody>
@@ -88,7 +90,15 @@ export default async function ProvidersPage() {
                       {p.hieConnected ? <Pill color="sky">{p.hieNetwork ?? 'connected'}</Pill> : <Pill>—</Pill>}
                     </td>
                     <td className="py-2 pr-4 text-sm">{p.memberCount}</td>
-                    <td className="py-2 text-sm font-medium">{orgGaps[p.npi] ?? 0}</td>
+                    <td className="py-2 pr-4 text-sm font-medium">{orgGaps[p.npi] ?? 0}</td>
+                    <td className="py-2 text-xs">
+                      <Link
+                        href={`/rosters?audience=provider&npi=${p.npi}`}
+                        className="text-accent hover:underline"
+                      >
+                        Generate →
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>

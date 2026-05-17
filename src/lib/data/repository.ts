@@ -26,6 +26,7 @@ import type {
   MemberAttribution,
   MedicationRequest,
   Observation,
+  PayerAccessGrant,
   ProviderOrg,
   SeedSummary
 } from './types';
@@ -230,7 +231,8 @@ export const repos = {
   gaps: make<MeasureGap>('gaps'),
   engagement: make<EngagementQueueEntry>('engagementQueue'),
   ehrConnections: make<EhrConnection>('ehrConnections'),
-  campaigns: make<Campaign>('campaigns')
+  campaigns: make<Campaign>('campaigns'),
+  payerAccess: make<PayerAccessGrant>('payerAccess')
 };
 
 // ---- Seed summary (single object, not a collection) -----------------------
