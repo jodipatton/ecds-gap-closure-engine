@@ -1,20 +1,12 @@
-import { ProviderTabs } from '@/components/provider/ProviderTabs';
-import { ProviderBadge } from '@/components/brand';
+import { ProviderSideNav } from '@/components/provider/ProviderTabs';
 
-// Provider portal shell. Distinct from the health-plan-facing console: the
-// audience here is the practice (Reliant Medical Group). Dashboard-first with
-// tabs for EHR connection, Provider Access API, contract value, and care.
+// Provider portal shell. Section nav lives in a left rail (mirroring the
+// payer console), with the page content to its right.
 export default function ProviderLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4">
-        <ProviderBadge height={48} />
-        <span className="rounded-md bg-ink px-3 py-1 text-xs font-semibold text-white">
-          Provider Portal
-        </span>
-      </div>
-      <ProviderTabs />
-      {children}
+    <div className="flex gap-6">
+      <ProviderSideNav />
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
 }
