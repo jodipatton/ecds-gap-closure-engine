@@ -2,33 +2,29 @@ import Link from 'next/link';
 import { repos } from '@/lib/data/repository';
 import { payerAccessConfig } from '@/lib/payer/access';
 import { PayerAccessWizard } from '@/components/payer/PayerAccessWizard';
+import { getPractice } from '@/lib/provider/practice';
 
 export const dynamic = 'force-dynamic';
 
-interface SearchParams {
-  npi?: string;
-}
-
-export default async function PayerAccessPage({ searchParams }: { searchParams: SearchParams }) {
-  const [providers, grants] = await Promise.all([
-    repos.providers.list(),
+export default async function PayerAccessPage() {
+  const [practice, grants] = await Promise.all([
+    getPractice(),
     repos.payerAccess.list()
   ]);
 
-  if (providers.length === 0) {
+  if (!practice) {
     return (
       <div className="rounded-lg border border-slate-200 bg-white p-6">
         <h1 className="text-xl font-semibold">Payer Access API onboarding</h1>
         <p className="mt-2 text-sm text-slate-600">
           No providers yet. Run Seed from the{' '}
-          <Link href="/" className="text-accent hover:underline">plan dashboard</Link>.
+          <Link href="/" className="text-accent hover:underline">plan console</Link>.
         </p>
       </div>
     );
   }
 
-  const selectedNpi = searchParams.npi ?? grants[0]?.providerNpi ?? providers[0].npi;
-  const existing = grants.find((g) => g.providerNpi === selectedNpi) ?? null;
+  const existing = grants.find((g) => g.providerNpi === practice.npi) ?? null;
 
   return (
     <div className="space-y-5">
@@ -43,7 +39,7 @@ export default async function PayerAccessPage({ searchParams }: { searchParams: 
       </div>
 
       <PayerAccessWizard
-        providers={providers.map((p) => ({ npi: p.npi, organizationName: p.organizationName }))}
+        providers={[{ npi: practice.npi, organizationName: practice.organizationName }]}
         config={payerAccessConfig()}
         existing={existing}
       />

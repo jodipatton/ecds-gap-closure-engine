@@ -11,6 +11,28 @@ export function CareActions({ memberId, measureId }: { memberId: string; measure
   const [open, setOpen] = useState<Channel | null>(null);
   const [content, setContent] = useState<{ subject: string; body: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [pushing, setPushing] = useState(false);
+  const [pushed, setPushed] = useState<string | null>(null);
+
+  async function pushToEhr() {
+    setPushing(true);
+    setPushed(null);
+    setErr(null);
+    try {
+      const r = await fetch('/api/ehr-push', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ memberId, measureId })
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error ?? 'Push failed');
+      setPushed(j.message ?? 'Pushed to EHR');
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setPushing(false);
+    }
+  }
 
   async function gen(channel: Channel) {
     setBusy(channel);
@@ -45,7 +67,15 @@ export function CareActions({ memberId, measureId }: { memberId: string; measure
             {busy === c ? '…' : LABEL[c]}
           </button>
         ))}
+        <button
+          onClick={pushToEhr}
+          disabled={pushing || !measureId}
+          className="rounded bg-accent px-2 py-0.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+        >
+          {pushing ? 'Pushing…' : 'Push to EHR'}
+        </button>
       </div>
+      {pushed && <span className="text-xs text-good">✓ {pushed}</span>}
       {open && (
         <div className="rounded border border-slate-200 bg-slate-50 p-2 text-xs">
           {err ? (

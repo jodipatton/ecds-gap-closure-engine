@@ -7,18 +7,21 @@ import { useState } from 'react';
 // artwork is bundled; everything is clearly a "for demo purposes only" UI.
 export function LogoMark({
   domain,
+  src,
   name,
   role,
   accent = '#1F6FEB',
   height = 40
 }: {
   domain: string;
+  src?: string; // explicit logo URL; falls back to a logo CDN by domain
   name: string;
   role?: string;
   accent?: string;
   height?: number;
 }) {
   const [failed, setFailed] = useState(false);
+  const logoSrc = src ?? `https://logo.clearbit.com/${domain}`;
 
   return (
     <span className="inline-flex items-center gap-3">
@@ -36,7 +39,7 @@ export function LogoMark({
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={`https://logo.clearbit.com/${domain}`}
+          src={logoSrc}
           alt={`${name} logo`}
           style={{ height, maxWidth: height * 5 }}
           className="object-contain"

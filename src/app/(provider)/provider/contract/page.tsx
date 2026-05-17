@@ -1,33 +1,31 @@
 import Link from 'next/link';
-import { repos } from '@/lib/data/repository';
 import { Card, StatTile, Pill, ProgressBar } from '@/components/ui';
 import { ensureContracts, valueForContract } from '@/lib/contracts/vbc';
+import { getPractice } from '@/lib/provider/practice';
 
 export const dynamic = 'force-dynamic';
 
-interface SearchParams {
-  npi?: string;
-}
-
-export default async function ProviderContractPage({ searchParams }: { searchParams: SearchParams }) {
-  const [contracts, providers] = await Promise.all([
+export default async function ProviderContractPage() {
+  const [contracts, practice] = await Promise.all([
     ensureContracts(),
-    repos.providers.list()
+    getPractice()
   ]);
 
-  if (contracts.length === 0) {
+  const contract = practice
+    ? contracts.find((c) => c.providerNpi === practice.npi)
+    : undefined;
+
+  if (!contract) {
     return (
       <Card>
         <p className="text-sm text-slate-600">
-          No value-based contract on file. Seed and run the engine from the{' '}
-          <Link href="/" className="text-accent hover:underline">plan dashboard</Link>.
+          No value-based contract on file for this practice. Seed and run the engine from the{' '}
+          <Link href="/" className="text-accent hover:underline">plan console</Link>.
         </p>
       </Card>
     );
   }
 
-  const selectedNpi = searchParams.npi ?? contracts[0].providerNpi;
-  const contract = contracts.find((c) => c.providerNpi === selectedNpi) ?? contracts[0];
   const v = await valueForContract(contract);
   const attainmentPct = Math.min(
     100,
@@ -36,22 +34,12 @@ export default async function ProviderContractPage({ searchParams }: { searchPar
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ink">Your value-based contract</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {contract.organizationName} · {contract.payerName} · {contract.model} ·{' '}
-            effective {contract.effectiveYear}
-          </p>
-        </div>
-        <form action="/provider/contract" method="get" className="flex items-end gap-2">
-          <select name="npi" defaultValue={contract.providerNpi} className="rounded border border-slate-300 px-2 py-1.5 text-sm">
-            {contracts.map((c) => (
-              <option key={c.providerNpi} value={c.providerNpi}>{c.organizationName}</option>
-            ))}
-          </select>
-          <button type="submit" className="rounded border border-slate-300 px-3 py-1.5 text-sm">Switch</button>
-        </form>
+      <div>
+        <h1 className="text-2xl font-semibold text-ink">Your value-based contract</h1>
+        <p className="mt-1 text-sm text-slate-600">
+          {contract.organizationName} · {contract.payerName} · {contract.model} ·{' '}
+          effective {contract.effectiveYear}
+        </p>
       </div>
 
       <section className="grid grid-cols-2 gap-4 md:grid-cols-4">

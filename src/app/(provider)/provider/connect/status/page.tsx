@@ -6,10 +6,6 @@ import { ClinicalSyncButton } from '@/components/ehr/ClinicalSyncButton';
 
 export const dynamic = 'force-dynamic';
 
-interface SearchParams {
-  npi?: string;
-}
-
 const STATUS_COLOR = {
   active: 'green',
   expired: 'amber',
@@ -17,7 +13,7 @@ const STATUS_COLOR = {
   'pending-setup': 'slate'
 } as const;
 
-export default async function ConnectionStatusPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function ConnectionStatusPage() {
   const [providers, connections] = await Promise.all([
     repos.providers.list(),
     repos.ehrConnections.list()
@@ -32,37 +28,20 @@ export default async function ConnectionStatusPage({ searchParams }: { searchPar
       </Card>
     );
   }
-  const selectedNpi = searchParams.npi ?? connections[0]?.providerNpi ?? providers[0].npi;
-  const provider = providers.find((p) => p.npi === selectedNpi);
+  const provider = [...providers].sort((a, b) => b.memberCount - a.memberCount)[0];
   if (!provider) {
     return <Card><p className="text-sm text-slate-600">Provider not found.</p></Card>;
   }
-  const connection = connections.find((c) => c.providerNpi === selectedNpi);
+  const connection = connections.find((c) => c.providerNpi === provider.npi);
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ink">Connection status</h1>
-          <p className="text-sm text-slate-600 mt-1">
-            {provider.organizationName} · NPI <span className="font-mono">{provider.npi}</span> ·{' '}
-            {provider.ehrPlatform ?? 'unvalidated EHR'}
-          </p>
-        </div>
-        <form action="/provider/connect/status" method="get" className="flex items-center gap-2">
-          <select
-            name="npi"
-            defaultValue={provider.npi}
-            className="rounded border border-slate-300 px-2 py-1 text-sm"
-          >
-            {providers.map((p) => (
-              <option key={p.npi} value={p.npi}>
-                {p.organizationName}
-              </option>
-            ))}
-          </select>
-          <button type="submit" className="rounded border border-slate-300 px-2 py-1 text-xs">Switch</button>
-        </form>
+      <header>
+        <h1 className="text-2xl font-semibold text-ink">Connection status</h1>
+        <p className="text-sm text-slate-600 mt-1">
+          {provider.organizationName} · NPI <span className="font-mono">{provider.npi}</span> ·{' '}
+          {provider.ehrPlatform ?? 'unvalidated EHR'}
+        </p>
       </header>
 
       {!connection ? (

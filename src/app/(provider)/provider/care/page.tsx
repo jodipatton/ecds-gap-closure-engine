@@ -1,32 +1,39 @@
 import Link from 'next/link';
-import { repos } from '@/lib/data/repository';
 import { Card, Pill, StatTile } from '@/components/ui';
 import { buildRoster } from '@/lib/rosters/roster';
 import { CareActions } from '@/components/provider/CareActions';
+import { getPractice, practiceClinicians, clinicianForMember } from '@/lib/provider/practice';
 
 export const dynamic = 'force-dynamic';
 
 interface SearchParams {
-  npi?: string;
+  clinician?: string;
 }
 
 export default async function CarePage({ searchParams }: { searchParams: SearchParams }) {
-  const providers = await repos.providers.list();
-  if (providers.length === 0) {
+  const practice = await getPractice();
+  if (!practice) {
     return (
       <Card>
         <p className="text-sm text-slate-600">
           No data yet. Seed and run the engine from the{' '}
-          <Link href="/" className="text-accent hover:underline">plan dashboard</Link>.
+          <Link href="/" className="text-accent hover:underline">plan console</Link>.
         </p>
       </Card>
     );
   }
 
-  const byPanel = [...providers].sort((a, b) => b.memberCount - a.memberCount);
-  const npi = searchParams.npi ?? byPanel[0].npi;
-  const roster = await buildRoster('provider', npi);
-  const needCare = roster.rows.filter((r) => r.openGapCount > 0);
+  const clinicians = practiceClinicians(practice);
+  const selected = searchParams.clinician ?? 'all';
+
+  const roster = await buildRoster('provider', practice.npi);
+  const withClinician = roster.rows
+    .filter((r) => r.openGapCount > 0)
+    .map((r) => ({ ...r, clinician: clinicianForMember(r.memberId, clinicians) }));
+  const needCare =
+    selected === 'all'
+      ? withClinician
+      : withClinician.filter((r) => r.clinician.id === selected);
   const totalGaps = needCare.reduce((s, r) => s + r.openGapCount, 0);
 
   return (
@@ -35,25 +42,44 @@ export default async function CarePage({ searchParams }: { searchParams: SearchP
         <div>
           <h1 className="text-2xl font-semibold text-ink">Members needing care</h1>
           <p className="mt-1 text-sm text-slate-600">
-            {roster.scope} · members with open HEDIS care gaps. Generate a call script, text, or
-            letter per member.
+            {practice.organizationName} · members with open HEDIS care gaps. Filter by the clinician
+            the member is seeing, then generate a call, text, or letter — or push it into the EHR.
           </p>
         </div>
         <form action="/provider/care" method="get" className="flex items-end gap-2">
-          <select name="npi" defaultValue={npi} className="rounded border border-slate-300 px-2 py-1.5 text-sm">
-            {byPanel.map((p) => (
-              <option key={p.npi} value={p.npi}>{p.organizationName} ({p.memberCount})</option>
-            ))}
-          </select>
-          <button type="submit" className="rounded border border-slate-300 px-3 py-1.5 text-sm">Switch</button>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs uppercase tracking-wide text-slate-500">Seeing clinician</span>
+            <select
+              name="clinician"
+              defaultValue={selected}
+              className="rounded border border-slate-300 px-2 py-1.5 text-sm"
+            >
+              <option value="all">All clinicians</option>
+              {clinicians.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} · {c.specialty}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" className="rounded border border-slate-300 px-3 py-1.5 text-sm">
+            Filter
+          </button>
         </form>
       </div>
 
       <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatTile label="Members needing care" value={needCare.length} />
         <StatTile label="Open care gaps" value={totalGaps} />
-        <StatTile label="Panel members" value={roster.rowCount} hint="actionable" />
-        <StatTile label="Suspected conditions" value={needCare.filter((r) => r.suspectedHccCount > 0).length} hint="to document" />
+        <StatTile
+          label="Clinician"
+          value={selected === 'all' ? 'All' : clinicians.find((c) => c.id === selected)?.name ?? '—'}
+        />
+        <StatTile
+          label="Suspected conditions"
+          value={needCare.filter((r) => r.suspectedHccCount > 0).length}
+          hint="to document"
+        />
       </section>
 
       <Card>
@@ -62,6 +88,7 @@ export default async function CarePage({ searchParams }: { searchParams: SearchP
             <thead>
               <tr className="border-b text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="py-2 pr-4">Member</th>
+                <th className="py-2 pr-4">Seeing</th>
                 <th className="py-2 pr-4">Open care gaps</th>
                 <th className="py-2 pr-4">Recommended action</th>
                 <th className="py-2">Outreach</th>
@@ -69,7 +96,7 @@ export default async function CarePage({ searchParams }: { searchParams: SearchP
             </thead>
             <tbody>
               {needCare.length === 0 && (
-                <tr><td colSpan={4} className="py-6 text-slate-500">No open care gaps for this panel.</td></tr>
+                <tr><td colSpan={5} className="py-6 text-slate-500">No open care gaps for this selection.</td></tr>
               )}
               {needCare.slice(0, 150).map((r) => {
                 const firstMeasure = r.openGapMeasures.split('; ')[0];
@@ -78,6 +105,10 @@ export default async function CarePage({ searchParams }: { searchParams: SearchP
                     <td className="py-2 pr-4">
                       <div>{r.memberName}</div>
                       <div className="text-xs text-slate-400">{r.memberId}</div>
+                    </td>
+                    <td className="py-2 pr-4 text-xs">
+                      <div>{r.clinician.name}</div>
+                      <div className="text-slate-400">{r.clinician.specialty}</div>
                     </td>
                     <td className="py-2 pr-4 text-xs">
                       <Pill color="rose">{r.openGapCount}</Pill>{' '}

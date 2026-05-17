@@ -68,6 +68,7 @@ export function PayerBadge({ height = 40 }: { height?: number }) {
     <span className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2">
       <LogoMark
         domain="fallonhealth.org"
+        src="https://fallonhealth.org/-/media/Images/FCHP/Home/fallon-health-web.ashx?h=100&iar=0&w=364&hash=CD9E3CC200C69100140A0FF934958770BFB7F628"
         name="Fallon Health"
         role="Payer"
         accent="#0F766E"
