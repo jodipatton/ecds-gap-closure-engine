@@ -1,24 +1,19 @@
-import Link from 'next/link';
+import { ProviderTabs } from '@/components/provider/ProviderTabs';
+import { ProviderBadge } from '@/components/brand';
 
-// Provider portal shell. Distinct from the health-plan-facing dashboard:
-// the audience here is the provider's IT admin / practice manager, not the
-// quality director. Nav is intentionally narrow.
+// Provider portal shell. Distinct from the health-plan-facing console: the
+// audience here is the practice (Reliant Medical Group). Dashboard-first with
+// tabs for EHR connection, Provider Access API, contract value, and care.
 export default function ProviderLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="space-y-6">
-      <nav className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-5 py-3 text-sm">
-        <div className="flex items-center gap-3">
-          <span className="rounded bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white">Provider portal</span>
-          <span className="text-slate-500">EHR connection · payer access · data acquisition</span>
-        </div>
-        <div className="flex items-center gap-4 text-slate-600">
-          <Link href="/provider/connect" className="hover:text-ink">EHR Connect</Link>
-          <Link href="/provider/connect/status" className="hover:text-ink">Status</Link>
-          <Link href="/provider/payer-access" className="hover:text-ink">Payer Access API</Link>
-          <Link href="/provider/contract" className="hover:text-ink">My Contract</Link>
-          <Link href="/" className="hover:text-ink">← Plan dashboard</Link>
-        </div>
-      </nav>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4">
+        <ProviderBadge height={48} />
+        <span className="rounded-md bg-ink px-3 py-1 text-xs font-semibold text-white">
+          Provider Portal
+        </span>
+      </div>
+      <ProviderTabs />
       {children}
     </div>
   );

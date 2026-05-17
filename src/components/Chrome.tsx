@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { PayerBadge, ProviderBadge } from '@/components/brand';
+import { PayerBadge } from '@/components/brand';
 
 // Top chrome shown on every page: a persistent "demo only" notice plus the
 // active tenant badge (Fallon Health for plan tools, Reliant Medical Group
@@ -16,7 +16,8 @@ export function Chrome() {
         <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
         For demo purposes only — synthetic data
       </span>
-      {isProvider ? <ProviderBadge /> : <PayerBadge />}
+      {/* Provider portal renders its own large tenant logo in its shell. */}
+      {!isProvider && <PayerBadge height={44} />}
     </div>
   );
 }

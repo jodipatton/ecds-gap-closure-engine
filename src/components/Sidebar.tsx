@@ -39,7 +39,7 @@ const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
   },
   {
     title: 'Provider portal',
-    items: [{ href: '/provider/connect', label: 'Provider portal' }]
+    items: [{ href: '/provider', label: 'Provider portal' }]
   }
 ];
 

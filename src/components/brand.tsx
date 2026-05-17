@@ -22,41 +22,34 @@ export function OneUpWordmark({
   );
 }
 
-function OrgBadge({
-  name,
-  role,
-  accent
-}: {
-  name: string;
-  role: string;
-  accent: string;
-}) {
+import { LogoMark } from '@/components/LogoMark';
+
+// Payer tenant for the plan-facing tools.
+export function PayerBadge({ height = 40 }: { height?: number }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5">
-      <span
-        className="grid h-6 w-6 place-items-center rounded text-[11px] font-bold text-white"
-        style={{ backgroundColor: accent }}
-      >
-        {name
-          .split(' ')
-          .slice(0, 2)
-          .map((w) => w[0])
-          .join('')}
-      </span>
-      <span className="leading-tight">
-        <span className="block text-xs font-semibold text-ink">{name}</span>
-        <span className="block text-[10px] uppercase tracking-wide text-slate-500">{role}</span>
-      </span>
+    <span className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2">
+      <LogoMark
+        domain="fallonhealth.org"
+        name="Fallon Health"
+        role="Payer"
+        accent="#0F766E"
+        height={height}
+      />
     </span>
   );
 }
 
-// Payer tenant for the plan-facing tools.
-export function PayerBadge() {
-  return <OrgBadge name="Fallon Health" role="Payer" accent="#0F766E" />;
-}
-
 // Provider tenant for the provider portal.
-export function ProviderBadge() {
-  return <OrgBadge name="Reliant Medical Group" role="Provider network" accent="#1F6FEB" />;
+export function ProviderBadge({ height = 40 }: { height?: number }) {
+  return (
+    <span className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2">
+      <LogoMark
+        domain="reliantmedicalgroup.org"
+        name="Reliant Medical Group"
+        role="Provider network"
+        accent="#1F6FEB"
+        height={height}
+      />
+    </span>
+  );
 }
