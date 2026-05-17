@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { OneUpWordmark } from '@/components/brand';
+import { OneUpLogo } from '@/components/brand';
 
 interface NavItem {
   href: string;
@@ -53,11 +53,8 @@ export function Sidebar() {
 
   return (
     <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col bg-ink text-slate-300">
-      <div className="flex items-center gap-2 px-5 py-5">
-        <span className="grid h-7 w-7 place-items-center rounded-md bg-accent text-sm font-bold text-white">
-          1↑
-        </span>
-        <OneUpWordmark variant="dark" />
+      <div className="px-5 py-6">
+        <OneUpLogo height={28} />
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-6">
