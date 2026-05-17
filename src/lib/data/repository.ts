@@ -145,27 +145,39 @@ function makeKvRepo<T>(collection: string): CollectionRepo<T> {
 
 const FS_COLLECTION = 'ecds_store';
 
-let _fsDb: any = null;
-async function fsDb() {
-  if (_fsDb) return _fsDb;
-  // firebase-admin is CJS; normalize the dynamic-import interop shape.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const mod: any = await import('firebase-admin');
-  const admin: any = mod.default ?? mod;
-  if (admin.apps.length === 0) {
-    const raw = process.env.FIREBASE_SERVICE_ACCOUNT ?? '';
-    const json = raw.trim().startsWith('{')
-      ? raw
-      : Buffer.from(raw, 'base64').toString('utf-8');
-    const serviceAccount = JSON.parse(json);
-    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-  }
-  _fsDb = admin.firestore();
-  // The engine emits optional fields (e.g. MeasureGap.missingDataElement) as
-  // `undefined` on closed gaps; Firestore rejects undefined unless told to
-  // skip it. settings() must run once before any operation.
-  _fsDb.settings({ ignoreUndefinedProperties: true });
-  return _fsDb;
+// Cache the *initialization promise* (not just the client). Server components
+// fan out repo reads via Promise.all, so fsDb() is called concurrently; a
+// single shared promise guarantees settings() runs exactly once and strictly
+// before any read/write (calling it after the client is used throws).
+let _fsInit: Promise<any> | null = null;
+function fsDb(): Promise<any> {
+  if (_fsInit) return _fsInit;
+  _fsInit = (async () => {
+    // firebase-admin is CJS; normalize the dynamic-import interop shape.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod: any = await import('firebase-admin');
+    const admin: any = mod.default ?? mod;
+    if (admin.apps.length === 0) {
+      const raw = process.env.FIREBASE_SERVICE_ACCOUNT ?? '';
+      const json = raw.trim().startsWith('{')
+        ? raw
+        : Buffer.from(raw, 'base64').toString('utf-8');
+      const serviceAccount = JSON.parse(json);
+      admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    }
+    const db = admin.firestore();
+    // The engine emits optional fields (e.g. MeasureGap.missingDataElement)
+    // as `undefined` on closed gaps; Firestore rejects undefined unless told
+    // to skip it. settings() must run once, before any operation — guarded in
+    // case a warm lambda already configured the singleton.
+    try {
+      db.settings({ ignoreUndefinedProperties: true });
+    } catch {
+      /* already initialized on a warm instance — safe to ignore */
+    }
+    return db;
+  })();
+  return _fsInit;
 }
 
 async function fsRead<T>(docId: string, fallback: T): Promise<T> {
