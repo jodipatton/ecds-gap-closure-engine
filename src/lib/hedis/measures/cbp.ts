@@ -45,7 +45,7 @@ export const cbp: MeasureSpec = {
       return {
         ok: false,
         evidence: [],
-        missingDataElement: 'FHIR Observation LOINC 8480-6 / 8462-4 (BP) in measurement year'
+        missing: { kind: 'observation', description: 'FHIR Observation LOINC 8480-6 / 8462-4 (BP) in measurement year' }
       };
     }
     const ok = sys.valueQuantity.value < 140 && dia.valueQuantity.value < 90;

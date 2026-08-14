@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Card, StatTile, Pill, ProgressBar } from '@/components/ui';
 import { ensureContracts, valueForContract } from '@/lib/contracts/vbc';
+import { getSnapshot } from '@/lib/data/snapshot';
 import { getPractice } from '@/lib/provider/practice';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,7 @@ export default async function ProviderContractPage() {
     );
   }
 
-  const v = await valueForContract(contract);
+  const v = valueForContract(await getSnapshot(), contract);
   const attainmentPct = Math.min(
     100,
     contract.targetRatePct === 0 ? 100 : Math.round((v.avgRatePct / contract.targetRatePct) * 100)

@@ -124,11 +124,20 @@ export type GapStatus =
   | 'excluded'
   | 'not-eligible';
 
+/** What kind of clinical data would close a still-open gap. */
+export type MissingDataKind = 'observation' | 'document' | 'condition' | 'medication' | 'immunization';
+
+export interface MissingData {
+  kind: MissingDataKind;
+  description: string; // e.g., "FHIR Observation LOINC 4548-4"
+}
+
 export interface MeasureGap {
+  id: string; // `${measureId}:${memberId}`
   measureId: string;
   memberId: string;
   status: GapStatus;
-  missingDataElement?: string; // e.g., "FHIR Observation LOINC 4548-4"
+  missingDataElement?: string; // human-readable form of MissingData.description
   evidence?: string[]; // codes that contributed
   computedAt: ISODate;
 }
@@ -188,7 +197,7 @@ export interface MeasureSpec {
   satisfiedByClinical: (ctx: MeasureContext) => {
     ok: boolean;
     evidence: string[];
-    missingDataElement?: string;
+    missing?: MissingData;
   };
 }
 

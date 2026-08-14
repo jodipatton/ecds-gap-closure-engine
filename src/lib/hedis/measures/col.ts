@@ -48,6 +48,6 @@ export const col: MeasureSpec = {
     );
     return doc
       ? { ok: true, evidence: [`DocumentReference LOINC 34117-2 dated ${doc.date}`] }
-      : { ok: false, evidence: [], missingDataElement: 'Colonoscopy DocumentReference (LOINC 34117-2)' };
+      : { ok: false, evidence: [], missing: { kind: 'document', description: 'Colonoscopy DocumentReference (LOINC 34117-2)' } };
   }
 };

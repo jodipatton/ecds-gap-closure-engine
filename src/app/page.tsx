@@ -1,13 +1,13 @@
 import Link from 'next/link';
-import { activeBackend, repos, readSeedSummary } from '@/lib/data/repository';
+import { activeBackend } from '@/lib/data/repository';
+import { getRisk, getSnapshot } from '@/lib/data/snapshot';
 import { Card, Pill, ProgressBar, StatTile } from '@/components/ui';
 import { SeedAndRun } from '@/components/SeedAndRun';
 import { ehrPlatformGapImpact } from '@/lib/hedis/engine';
 import { recommendedActions } from '@/lib/agent/recommendations';
-import { planRiskSummary } from '@/lib/risk/raf';
 import { allContractValues } from '@/lib/contracts/vbc';
 import { buildRoster } from '@/lib/rosters/roster';
-import { ensureSeedAudit, listAudit } from '@/lib/audit/audit';
+import { ensureSeedAudit } from '@/lib/audit/audit';
 import { campaignProgress } from '@/lib/outreach/campaigns';
 import { denominator, gapValue } from '@/lib/analytics/projection';
 
@@ -18,45 +18,25 @@ export default async function Home() {
   const backend = activeBackend();
   const needsKvProvisioning = onVercel && backend === 'json';
 
+  // Seed-provenance audit rows must exist before the snapshot reads them.
   await ensureSeedAudit();
-  const [
-    summary,
-    results,
-    gaps,
-    engagement,
-    ehrImpact,
-    actions,
-    members,
-    conditions,
-    claims,
-    campaigns,
-    audit,
-    payerRoster
-  ] = await Promise.all([
-    readSeedSummary(),
-    repos.hedisResults.list(),
-    repos.gaps.list(),
-    repos.engagement.list(),
-    ehrPlatformGapImpact(),
+  const snap = await getSnapshot();
+  const { summary, results, gaps, engagement, campaigns, auditEvents: audit } = snap;
+  const [ehrImpact, actions, risk, payerRoster] = await Promise.all([
+    ehrPlatformGapImpact(snap),
     recommendedActions(4),
-    repos.members.list(),
-    repos.conditions.list(),
-    repos.claims.list(),
-    repos.campaigns.list(),
-    listAudit(),
+    getRisk(),
     buildRoster('payer')
   ]);
 
   const seeded = summary !== null;
   const hasResults = results.length > 0;
-  const my = summary?.measurementYear ?? new Date().getFullYear();
 
   const totalDenominator = results.reduce((s, r) => s + denominator(r), 0);
   const totalNumerator = results.reduce((s, r) => s + r.combinedNumerator, 0);
   const totalGaps = gaps.filter((g) => g.status.startsWith('open-')).length;
   const overallRate = totalDenominator === 0 ? 0 : (totalNumerator / totalDenominator) * 100;
 
-  const risk = planRiskSummary(members, conditions, claims, my);
   const contractValues = hasResults ? await allContractValues() : [];
   const contractValueAtStake = contractValues.reduce((s, v) => s + v.totalValueAtStake, 0);
   const dollarOpportunity = results.reduce((s, r) => s + r.gapCount * gapValue(r.dataTier), 0);

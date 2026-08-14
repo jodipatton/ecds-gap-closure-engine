@@ -43,7 +43,7 @@ export const hbd: MeasureSpec = {
       return {
         ok: false,
         evidence: [],
-        missingDataElement: 'FHIR Observation LOINC 4548-4 (HbA1c) with valueQuantity in measurement year'
+        missing: { kind: 'observation', description: 'FHIR Observation LOINC 4548-4 (HbA1c) with valueQuantity in measurement year' }
       };
     }
     const ok = obs.valueQuantity.value < 8.0;

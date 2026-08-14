@@ -68,6 +68,6 @@ export const fum: MeasureSpec = {
     );
     return ok
       ? { ok: true, evidence: ['Discharge summary DocumentReference (LOINC 18842-5) in MY'] }
-      : { ok: false, evidence: [], missingDataElement: 'CCDA Discharge Summary (LOINC 18842-5) for ED encounter' };
+      : { ok: false, evidence: [], missing: { kind: 'document', description: 'CCDA Discharge Summary (LOINC 18842-5) for ED encounter' } };
   }
 };

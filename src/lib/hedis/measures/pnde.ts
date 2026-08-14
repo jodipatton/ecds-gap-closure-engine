@@ -52,6 +52,6 @@ export const pnde: MeasureSpec = {
     );
     return ok
       ? { ok: true, evidence: ['CCDA Postpartum care note (LOINC 57133-1)'] }
-      : { ok: false, evidence: [], missingDataElement: 'CCDA Postpartum care note (LOINC 57133-1)' };
+      : { ok: false, evidence: [], missing: { kind: 'document', description: 'CCDA Postpartum care note (LOINC 57133-1)' } };
   }
 };

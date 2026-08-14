@@ -7,10 +7,10 @@
 // framings.
 
 import { repos, readSeedSummary } from '@/lib/data/repository';
+import { getSnapshot, type Snapshot } from '@/lib/data/snapshot';
 import { computeMemberRisk } from '@/lib/risk/raf';
 import { hash01 as hash } from '@/lib/shared/hash';
-import { groupBy } from '@/lib/shared/collections';
-import type { Claim, Condition, ValueContract, VbcModel } from '@/lib/data/types';
+import type { ValueContract, VbcModel } from '@/lib/data/types';
 
 const PAYER_NAME = 'Fallon Health';
 const MEASURE_POOL = ['BCS', 'COL', 'WCV', 'CIS', 'HBD', 'CBP', 'DSF-E'];
@@ -78,47 +78,36 @@ export interface ContractValue {
   totalValueAtStake: number;
 }
 
-export async function valueForContract(contract: ValueContract): Promise<ContractValue> {
-  const [attribution, gaps, results, members, conditions, claims, summary] = await Promise.all([
-    repos.attribution.list(),
-    repos.gaps.list(),
-    repos.hedisResults.list(),
-    repos.members.list(),
-    repos.conditions.list(),
-    repos.claims.list(),
-    readSeedSummary()
-  ]);
-  const my = summary?.measurementYear ?? new Date().getFullYear();
+/** Pure valuation over a preloaded snapshot — no I/O. */
+export function valueForContract(snap: Snapshot, contract: ValueContract): ContractValue {
+  const my = snap.measurementYear;
   const inScope = new Set(contract.measureIds);
 
   const panelMemberIds = new Set(
-    attribution.filter((a) => a.pcp?.npi === contract.providerNpi).map((a) => a.memberId)
+    snap.attribution.filter((a) => a.pcp?.npi === contract.providerNpi).map((a) => a.memberId)
   );
 
   let closed = 0;
   let open = 0;
-  for (const g of gaps) {
+  for (const g of snap.gaps) {
     if (!panelMemberIds.has(g.memberId) || !inScope.has(g.measureId)) continue;
     if (g.status.startsWith('closed-')) closed++;
     else if (g.status.startsWith('open-')) open++;
   }
 
-  const scopedResults = results.filter((r) => inScope.has(r.measureId));
+  const scopedResults = snap.results.filter((r) => inScope.has(r.measureId));
   const denom = scopedResults.reduce((s, r) => s + r.combinedNumerator + r.gapCount, 0);
   const num = scopedResults.reduce((s, r) => s + r.combinedNumerator, 0);
   const avgRatePct = denom === 0 ? 0 : Number(((num / denom) * 100).toFixed(1));
 
-  const memberById = new Map(members.map((m) => [m.id, m]));
-  const condByMember = groupBy<Condition, string>(conditions, (c) => c.memberId);
-  const claimByMember = groupBy<Claim, string>(claims, (c) => c.memberId);
   let riskRecapture = 0;
   for (const id of panelMemberIds) {
-    const m = memberById.get(id);
+    const m = snap.memberById.get(id);
     if (!m) continue;
     riskRecapture += computeMemberRisk(
       m,
-      condByMember.get(id) ?? [],
-      claimByMember.get(id) ?? [],
+      snap.conditionsByMember.get(id) ?? [],
+      snap.claimsByMember.get(id) ?? [],
       my
     ).annualRevenueOpportunity;
   }
@@ -149,12 +138,12 @@ export async function valueForContract(contract: ValueContract): Promise<Contrac
 }
 
 export async function allContractValues(): Promise<ContractValue[]> {
-  const contracts = await ensureContracts();
-  return Promise.all(contracts.map(valueForContract));
+  const [contracts, snap] = await Promise.all([ensureContracts(), getSnapshot()]);
+  return contracts.map((c) => valueForContract(snap, c));
 }
 
 export async function contractForProvider(npi: string): Promise<ContractValue | null> {
-  const contracts = await ensureContracts();
+  const [contracts, snap] = await Promise.all([ensureContracts(), getSnapshot()]);
   const c = contracts.find((x) => x.providerNpi === npi);
-  return c ? valueForContract(c) : null;
+  return c ? valueForContract(snap, c) : null;
 }

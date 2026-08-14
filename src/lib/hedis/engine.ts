@@ -9,6 +9,9 @@
 //            to the engagement queue with a provider recommendation, OR
 //            tag them for clinical-data acquisition based on their attributed
 //            provider's EHR platform.
+//
+// `computeResults` is pure (fully unit-testable); `runEngine` is the thin
+// load-compute-persist wrapper the API routes and CLI call.
 
 import type {
   Claim,
@@ -21,11 +24,32 @@ import type {
   MeasureSpec,
   MedicationRequest,
   Member,
+  MemberAttribution,
   Observation,
   ProviderOrg
 } from '@/lib/data/types';
 import { repos, readSeedSummary } from '@/lib/data/repository';
+import { groupBy, keyBy } from '@/lib/shared/collections';
 import { MEASURES } from './measures';
+
+export interface EngineInput {
+  measurementYear: number;
+  ranAt: string;
+  members: Member[];
+  claims: Claim[];
+  observations: Observation[];
+  conditions: Condition[];
+  medications: MedicationRequest[];
+  documents: DocumentReference[];
+  providers: ProviderOrg[];
+  attribution: MemberAttribution[];
+}
+
+export interface EngineOutput {
+  results: HedisResult[];
+  gaps: MeasureGap[];
+  engagement: EngagementQueueEntry[];
+}
 
 interface EngineRunSummary {
   measurementYear: number;
@@ -33,17 +57,6 @@ interface EngineRunSummary {
   results: HedisResult[];
   totalGaps: number;
   totalEngagementEntries: number;
-}
-
-function indexBy<T, K extends string | number>(arr: T[], keyFn: (t: T) => K): Map<K, T[]> {
-  const m = new Map<K, T[]>();
-  for (const x of arr) {
-    const k = keyFn(x);
-    const list = m.get(k) ?? [];
-    list.push(x);
-    m.set(k, list);
-  }
-  return m;
 }
 
 function buildContext(
@@ -95,44 +108,34 @@ function suggestProvidersFor(
   return ranked;
 }
 
-export async function runEngine({ measurementYear }: { measurementYear?: number } = {}): Promise<EngineRunSummary> {
-  const summary = await readSeedSummary();
-  const my = measurementYear ?? summary?.measurementYear ?? new Date().getFullYear();
-
-  const [members, claims, obs, cond, rx, docs, providers, attribution] = await Promise.all([
-    repos.members.list(),
-    repos.claims.list(),
-    repos.observations.list(),
-    repos.conditions.list(),
-    repos.medications.list(),
-    repos.documents.list(),
-    repos.providers.list(),
-    repos.attribution.list()
-  ]);
+/** Pure measures × members computation. No I/O. */
+export function computeResults(input: EngineInput): EngineOutput {
+  const { measurementYear: my, ranAt, members, providers, attribution } = input;
 
   const byMember = {
-    claims: indexBy(claims, (c) => c.memberId),
-    obs: indexBy(obs, (o) => o.memberId),
-    cond: indexBy(cond, (c) => c.memberId),
-    rx: indexBy(rx, (r) => r.memberId),
-    docs: indexBy(docs, (d) => d.memberId)
+    claims: groupBy(input.claims, (c) => c.memberId),
+    obs: groupBy(input.observations, (o) => o.memberId),
+    cond: groupBy(input.conditions, (c) => c.memberId),
+    rx: groupBy(input.medications, (r) => r.memberId),
+    docs: groupBy(input.documents, (d) => d.memberId)
   };
-  const attributionByMember = new Map(attribution.map((a) => [a.memberId, a]));
+  const attributionByMember = keyBy(attribution, (a) => a.memberId);
 
   const allGaps: MeasureGap[] = [];
   const engagement: EngagementQueueEntry[] = [];
   const engagementByMember = new Map<string, EngagementQueueEntry>();
   const results: HedisResult[] = [];
-  const ranAt = new Date().toISOString();
 
   for (const measure of MEASURES) {
     let eligible = 0;
     let excluded = 0;
     let numClaims = 0;
     let numClinical = 0;
+    let openWithEvidence = 0;
 
     for (const member of members) {
       const ctx = buildContext(member, my, byMember);
+      const gapId = `${measure.id}:${member.id}`;
 
       if (!measure.isEligible(ctx)) {
         continue;
@@ -142,6 +145,7 @@ export async function runEngine({ measurementYear }: { measurementYear?: number 
       if (measure.isExcluded(ctx)) {
         excluded++;
         allGaps.push({
+          id: gapId,
           measureId: measure.id,
           memberId: member.id,
           status: 'excluded',
@@ -155,6 +159,7 @@ export async function runEngine({ measurementYear }: { measurementYear?: number 
       if (claimsResult.ok) {
         numClaims++;
         allGaps.push({
+          id: gapId,
           measureId: measure.id,
           memberId: member.id,
           status: 'closed-claims',
@@ -169,6 +174,7 @@ export async function runEngine({ measurementYear }: { measurementYear?: number 
       if (clinicalResult.ok) {
         numClinical++;
         allGaps.push({
+          id: gapId,
           measureId: measure.id,
           memberId: member.id,
           status: 'closed-clinical',
@@ -179,14 +185,18 @@ export async function runEngine({ measurementYear }: { measurementYear?: number 
       }
 
       // Pass 3 — Roster (still open)
-      const status = clinicalResult.missingDataElement?.toLowerCase().includes('document')
+      const status = clinicalResult.missing?.kind === 'document'
         ? 'open-needs-document'
         : 'open-needs-clinical';
+      if (claimsResult.evidence.length > 0 || clinicalResult.evidence.length > 0) {
+        openWithEvidence++;
+      }
       allGaps.push({
+        id: gapId,
         measureId: measure.id,
         memberId: member.id,
         status,
-        missingDataElement: clinicalResult.missingDataElement,
+        missingDataElement: clinicalResult.missing?.description,
         evidence: clinicalResult.evidence,
         computedAt: ranAt
       });
@@ -232,9 +242,14 @@ export async function runEngine({ measurementYear }: { measurementYear?: number 
     const combined = numClaims + numClinical;
     const denom = Math.max(eligible - excluded, 0);
     const gapCount = denom - combined;
+    // Invariant (locked by tests): combinedNumerator + gapCount === eligible − excluded,
+    // i.e. `denominator()` in analytics/projection reconstructs this same denominator.
     const rate = denom === 0 ? 0 : (combined / denom) * 100;
-    const dataCompleteness =
-      denom === 0 ? 0 : ((numClaims + numClinical) / denom) * 100;
+    // Share of the denominator with ANY structured evidence (claims or
+    // clinical) — members whose gap needs outreach rather than data. A low
+    // value means the plan can't even see these members' care yet.
+    const withData = combined + openWithEvidence;
+    const dataCompleteness = denom === 0 ? 0 : (withData / denom) * 100;
     results.push({
       measureId: measure.id,
       measureName: measure.name,
@@ -275,9 +290,42 @@ export async function runEngine({ measurementYear }: { measurementYear?: number 
     }
   }
 
+  return { results, gaps: allGaps, engagement };
+}
+
+/** Load → compute → persist. Called by /api/engine, EHR sync, and the CLI. */
+export async function runEngine({ measurementYear }: { measurementYear?: number } = {}): Promise<EngineRunSummary> {
+  const summary = await readSeedSummary();
+  const my = measurementYear ?? summary?.measurementYear ?? new Date().getFullYear();
+
+  const [members, claims, observations, conditions, medications, documents, providers, attribution] = await Promise.all([
+    repos.members.list(),
+    repos.claims.list(),
+    repos.observations.list(),
+    repos.conditions.list(),
+    repos.medications.list(),
+    repos.documents.list(),
+    repos.providers.list(),
+    repos.attribution.list()
+  ]);
+
+  const ranAt = new Date().toISOString();
+  const { results, gaps, engagement } = computeResults({
+    measurementYear: my,
+    ranAt,
+    members,
+    claims,
+    observations,
+    conditions,
+    medications,
+    documents,
+    providers,
+    attribution
+  });
+
   await Promise.all([
     repos.hedisResults.put(results),
-    repos.gaps.put(allGaps),
+    repos.gaps.put(gaps),
     repos.engagement.put(engagement)
   ]);
 
@@ -285,19 +333,27 @@ export async function runEngine({ measurementYear }: { measurementYear?: number 
     measurementYear: my,
     ranAt,
     results,
-    totalGaps: allGaps.filter((g) => g.status.startsWith('open-')).length,
+    totalGaps: gaps.filter((g) => g.status.startsWith('open-')).length,
     totalEngagementEntries: engagement.length
   };
 }
 
-// Aggregations consumed by the dashboard and agent tools.
-export async function ehrPlatformGapImpact() {
-  const [providers, attribution, gaps] = await Promise.all([
-    repos.providers.list(),
-    repos.attribution.list(),
-    repos.gaps.list()
-  ]);
-  const providerByNpi = new Map(providers.map((p) => [p.npi, p]));
+// Aggregation consumed by the dashboard, providers page, and agent tools.
+// Pass preloaded collections (e.g. from the request snapshot) to avoid
+// re-reading; with no argument it loads what it needs itself.
+export interface EhrImpactInput {
+  providers: ProviderOrg[];
+  attribution: MemberAttribution[];
+  gaps: MeasureGap[];
+}
+
+export async function ehrPlatformGapImpact(input?: EhrImpactInput) {
+  const { providers, attribution, gaps } = input ?? {
+    providers: await repos.providers.list(),
+    attribution: await repos.attribution.list(),
+    gaps: await repos.gaps.list()
+  };
+  const providerByNpi = keyBy(providers, (p) => p.npi);
   const memberToPlatform = new Map<string, { platform: string | null; npi: string | null; orgName: string | null }>();
   for (const a of attribution) {
     if (a.pcp) {

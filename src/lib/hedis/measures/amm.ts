@@ -37,7 +37,7 @@ export const amm: MeasureSpec = {
       : {
           ok: false,
           evidence: [`Antidepressant days supply observed: ${totalDays} (need ≥84)`],
-          missingDataElement: 'Additional FHIR MedicationRequest dispense records (RxNorm) covering 84-day acute phase'
+          missing: { kind: 'medication', description: 'Additional FHIR MedicationRequest dispense records (RxNorm) covering 84-day acute phase' }
         };
   }
 };

@@ -33,6 +33,6 @@ export const cis: MeasureSpec = {
     return { ok: missing === 0, evidence };
   },
   satisfiedByClinical() {
-    return { ok: false, evidence: [], missingDataElement: 'Immunization records (CVX) for missing antigens' };
+    return { ok: false, evidence: [], missing: { kind: 'immunization', description: 'Immunization records (CVX) for missing antigens' } };
   }
 };

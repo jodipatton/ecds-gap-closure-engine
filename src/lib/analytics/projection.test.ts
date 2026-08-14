@@ -7,17 +7,18 @@ function result(partial: Partial<HedisResult>): HedisResult {
     measureId: 'HBD',
     measureName: 'Hemoglobin A1c Control',
     dataTier: 'uscdi-v3',
+    domain: 'Cardiometabolic',
     eligiblePopulation: 100,
-    excluded: 0,
-    claimsNumerator: 0,
-    clinicalNumerator: 60,
+    numeratorFromClaims: 0,
+    numeratorFromClinical: 60,
     combinedNumerator: 60,
+    exclusions: 0,
     gapCount: 40,
     rate: 60,
     dataCompleteness: 60,
-    computedAt: '2025-06-01T00:00:00.000Z',
+    lastComputed: '2025-06-01T00:00:00.000Z',
     ...partial
-  } as HedisResult;
+  };
 }
 
 describe('gapValue / denominator', () => {
