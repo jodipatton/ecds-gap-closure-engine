@@ -21,7 +21,6 @@ import type {
   MeasureSpec,
   MedicationRequest,
   Member,
-  MemberAttribution,
   Observation,
   ProviderOrg
 } from '@/lib/data/types';
@@ -119,7 +118,6 @@ export async function runEngine({ measurementYear }: { measurementYear?: number 
     docs: indexBy(docs, (d) => d.memberId)
   };
   const attributionByMember = new Map(attribution.map((a) => [a.memberId, a]));
-  const providerByNpi = new Map(providers.map((p) => [p.npi, p]));
 
   const allGaps: MeasureGap[] = [];
   const engagement: EngagementQueueEntry[] = [];

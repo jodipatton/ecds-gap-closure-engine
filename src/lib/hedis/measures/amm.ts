@@ -5,8 +5,9 @@
 
 import type { MeasureSpec } from '@/lib/data/types';
 import { ageOn, claimsWithDx, myEnd } from '../util';
+import { CODES } from '../valuesets';
 
-const MDD_PREFIXES = ['F32', 'F33'];
+const MDD_PREFIXES = CODES.mdd_dx_prefixes;
 
 export const amm: MeasureSpec = {
   id: 'AMM',

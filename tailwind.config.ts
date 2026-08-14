@@ -12,12 +12,12 @@ const config: Config = {
         ink: '#0A1733', // deep navy — sidebar, headings
         paper: '#F7F9FC',
         accent: '#2563EB', // 1upHealth-style vivid blue — buttons, links, active
-        brand: '#2563EB',
-        brandNavy: '#0A1733',
-        brandAccent: '#15B79E', // teal accent
-        warn: '#F59E0B',
         bad: '#EF4444',
         good: '#10B981'
+      },
+      fontFamily: {
+        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'monospace']
       }
     }
   },

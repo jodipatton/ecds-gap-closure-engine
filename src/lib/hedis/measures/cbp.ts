@@ -12,8 +12,9 @@ import {
   myStart,
   priorYearStart
 } from '../util';
+import { CODES } from '../valuesets';
 
-const HTN_PREFIXES = ['I10', 'I11', 'I12', 'I13', 'I15', 'I16'];
+const HTN_PREFIXES = CODES.htn_dx_prefixes;
 
 export const cbp: MeasureSpec = {
   id: 'CBP',
@@ -35,10 +36,10 @@ export const cbp: MeasureSpec = {
   },
   satisfiedByClinical(ctx) {
     const sys = ctx.observations
-      .filter((o) => o.loinc === '8480-6' && o.effectiveDate >= myStart(ctx.measurementYear) && o.effectiveDate <= myEnd(ctx.measurementYear))
+      .filter((o) => o.loinc === CODES.bp_sys_loinc && o.effectiveDate >= myStart(ctx.measurementYear) && o.effectiveDate <= myEnd(ctx.measurementYear))
       .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate))[0];
     const dia = ctx.observations
-      .filter((o) => o.loinc === '8462-4' && o.effectiveDate >= myStart(ctx.measurementYear) && o.effectiveDate <= myEnd(ctx.measurementYear))
+      .filter((o) => o.loinc === CODES.bp_dia_loinc && o.effectiveDate >= myStart(ctx.measurementYear) && o.effectiveDate <= myEnd(ctx.measurementYear))
       .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate))[0];
     if (!sys?.valueQuantity || !dia?.valueQuantity) {
       return {

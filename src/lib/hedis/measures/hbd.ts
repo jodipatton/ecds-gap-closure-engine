@@ -13,8 +13,9 @@ import {
   myStart,
   priorYearStart
 } from '../util';
+import { CODES } from '../valuesets';
 
-const DIABETES_PREFIXES = ['E10', 'E11', 'E13'];
+const DIABETES_PREFIXES = CODES.diabetes_dx_prefixes;
 
 export const hbd: MeasureSpec = {
   id: 'HBD',
@@ -37,7 +38,7 @@ export const hbd: MeasureSpec = {
     return { ok: false, evidence: [] };
   },
   satisfiedByClinical(ctx) {
-    const obs = findObservation(ctx, '4548-4', myStart(ctx.measurementYear), myEnd(ctx.measurementYear));
+    const obs = findObservation(ctx, CODES.a1c_loinc, myStart(ctx.measurementYear), myEnd(ctx.measurementYear));
     if (!obs?.valueQuantity) {
       return {
         ok: false,

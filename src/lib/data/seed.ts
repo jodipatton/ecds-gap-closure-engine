@@ -8,6 +8,8 @@
 // generates equivalent shapes deterministically from a seed.
 
 import { repos, writeSeedSummary } from './repository';
+import { CODES } from '@/lib/hedis/valuesets';
+import { ageOn } from '@/lib/shared/dates';
 import type {
   Claim,
   Condition,
@@ -36,7 +38,6 @@ function mulberry32(seed: number) {
 const MEASUREMENT_YEAR = 2025;
 const MY_START = `${MEASUREMENT_YEAR}-01-01`;
 const MY_END = `${MEASUREMENT_YEAR}-12-31`;
-const PRIOR_YEAR_START = `${MEASUREMENT_YEAR - 1}-01-01`;
 
 function isoDate(y: number, m: number, d: number): ISODate {
   const mm = String(m).padStart(2, '0');
@@ -98,8 +99,6 @@ const ORG_NAMES = [
   'Evergreen Behavioral Wellness'
 ];
 
-const SPECIALTIES_BY_ORG: Record<string, string> = {};
-
 function chooseEhr(rand: () => number): EhrPlatform | null {
   let r = rand();
   for (const [ehr, p] of EHR_DISTRIBUTION) {
@@ -108,66 +107,6 @@ function chooseEhr(rand: () => number): EhrPlatform | null {
   }
   return null;
 }
-
-// --- code catalogs (illustrative; not licensed value sets) -----------------
-export const CODES = {
-  // Mammography
-  mammogram_cpt: ['77067', '77066', '77065'],
-  mammogram_hcpcs: ['G0202', 'G0204', 'G0206'],
-  mastectomy_icd10: ['Z90.13'],
-
-  // Colorectal screening
-  fobt_fit_cpt: ['82270', '82274'],
-  fit_dna_cpt: ['81528'],
-  flex_sig_cpt: ['45330', '45331', '45332', '45333', '45334', '45335'],
-  colonoscopy_cpt: ['45378', '45380', '45385', '45388', '45398'],
-  ct_colonography_cpt: ['74263'],
-
-  // Diabetes
-  diabetes_icd10: ['E10.9', 'E11.9', 'E11.65', 'E13.9'],
-  a1c_loinc: '4548-4',
-
-  // Hypertension
-  hypertension_icd10: ['I10', 'I11.9', 'I12.9', 'I13.10', 'I15.9'],
-  bp_sys_loinc: '8480-6',
-  bp_dia_loinc: '8462-4',
-
-  // Depression screening
-  phq9_loinc: ['44249-1', '44261-6'], // PHQ-9 & PHQ-2 panels
-  positive_depression_icd10: ['F32.9', 'F33.0'],
-  antidepressants_rxnorm: ['sertraline', 'escitalopram', 'fluoxetine', 'duloxetine'],
-
-  // Follow-up after ED for mental illness (FUM)
-  ed_visit_pos: '23',
-  mental_illness_icd10: ['F20.9', 'F31.9', 'F32.9', 'F33.0', 'F41.9', 'F43.10'],
-  followup_visit_cpt: ['90832', '90834', '90837', '99213', '99214'],
-
-  // Prenatal & postpartum (PND-E)
-  prenatal_visit_cpt: ['99201', '99202', '99203', '99204', '99205', '0500F'],
-  pregnancy_icd10: ['Z34.00', 'Z34.80', 'Z34.90', 'O09.90'],
-  delivery_cpt: ['59400', '59409', '59410', '59510', '59514', '59515'],
-  postpartum_visit_cpt: ['0503F', '99213', '99214', '57170'],
-
-  // AMM (antidepressant medication management)
-  amm_diagnosis_icd10: ['F32.0', 'F32.1', 'F32.2', 'F32.9', 'F33.0', 'F33.1', 'F33.2'],
-
-  // WCV (well-care visit)
-  well_visit_cpt: ['99381', '99382', '99383', '99384', '99385', '99391', '99392', '99393', '99394', '99395'],
-
-  // Childhood Immunization Status (CIS) — CVX codes
-  cvx: {
-    DTaP: ['20'],
-    IPV: ['10'],
-    MMR: ['03'],
-    HiB: ['48', '49', '50', '51'],
-    HepB: ['08'],
-    VZV: ['21'],
-    PCV: ['133'],
-    HepA: ['83'],
-    Rotavirus: ['116', '119'],
-    Influenza: ['88', '141', '150', '155']
-  } as const
-};
 
 // --- generation ------------------------------------------------------------
 
@@ -182,7 +121,6 @@ function genProviders(rand: () => number): ProviderOrg[] {
       name.includes('Behavioral') || name.includes('Counseling') ? 'Behavioral Health' :
       name.includes('Endocr') || name.includes('Diabetes') ? 'Endocrinology' :
       'Family Medicine';
-    SPECIALTIES_BY_ORG[name] = specialty;
     const ehrPlatform = chooseEhr(rand);
     // 70% pre-validated, 30% unvalidated
     const validated = rand() < 0.7;
@@ -254,14 +192,6 @@ function genMembers(rand: () => number, count: number): { members: Member[]; pla
     });
   }
   return { members, plans };
-}
-
-function ageOn(birthDate: ISODate, ref: ISODate): number {
-  const [by, bm, bd] = birthDate.split('-').map(Number);
-  const [ry, rm, rd] = ref.split('-').map(Number);
-  let a = ry - by;
-  if (rm < bm || (rm === bm && rd < bd)) a -= 1;
-  return a;
 }
 
 interface GenContext {
@@ -622,10 +552,10 @@ export async function runSeed({ memberCount = 60, seed = 42 } = {}) {
 if (typeof require !== 'undefined' && require.main === module) {
   const limit = Number(process.env.SEED_LIMIT ?? 60);
   runSeed({ memberCount: limit }).then((s) => {
-    // eslint-disable-next-line no-console
+     
     console.log('Seed complete:', s);
   }).catch((err) => {
-    // eslint-disable-next-line no-console
+     
     console.error(err);
     process.exit(1);
   });

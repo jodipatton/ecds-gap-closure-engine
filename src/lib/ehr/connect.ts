@@ -22,7 +22,7 @@ export function pickAuthMethod(connectionType: ConnectionType): AuthMethod {
   return 'smart-launch';
 }
 
-export function defaultScopesFor(connectionType: ConnectionType): string[] {
+export function defaultScopesFor(_connectionType: ConnectionType): string[] {
   // ECDS-aligned read scopes for HEDIS measure data
   return [
     'system/Patient.read',

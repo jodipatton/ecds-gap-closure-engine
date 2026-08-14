@@ -4,7 +4,7 @@
 // the demo always produces output.
 
 import OpenAI from 'openai';
-import { openAiToolSchema, toolMap, tools } from './tools';
+import { openAiToolSchema, toolMap } from './tools';
 
 const SYSTEM_PROMPT = `You are the ECDS Gap Closure agent for a health-plan demo.
 You have tools that read computed HEDIS ECDS results, the engagement queue,

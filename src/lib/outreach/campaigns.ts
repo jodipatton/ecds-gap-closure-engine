@@ -5,7 +5,6 @@
 import { repos } from '@/lib/data/repository';
 import type { Campaign, CampaignMember, ContactStatus } from '@/lib/data/types';
 
-export const CONTACT_FLOW: ContactStatus[] = ['not-contacted', 'contacted', 'scheduled', 'closed'];
 
 export interface CreateCampaignInput {
   name?: string;

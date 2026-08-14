@@ -21,7 +21,6 @@ export default async function ContractsPage() {
   }
 
   const totOpp = values.reduce((s, v) => s + v.openOpportunity, 0);
-  const totRisk = values.reduce((s, v) => s + v.riskRecapture, 0);
   const totAtRisk = values.reduce((s, v) => s + v.qualityAtRisk, 0);
   const totEarned = values.reduce((s, v) => s + v.earnedToDate, 0);
 

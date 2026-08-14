@@ -47,7 +47,6 @@ export function OneUpLogo({
   }
   return (
     <span className="inline-flex items-center gap-2">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={ONEUP_LOGO_INVERTED}
         alt="1upHealth"

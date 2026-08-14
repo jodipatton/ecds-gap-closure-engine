@@ -4,8 +4,9 @@
 
 import type { MeasureSpec } from '@/lib/data/types';
 import { ageOn, hasObservation, myEnd, myStart } from '../util';
+import { CODES } from '../valuesets';
 
-const PHQ_LOINCS = ['44249-1', '44261-6', '55758-7'];
+const PHQ_LOINCS = CODES.phq_screening_loinc;
 
 export const dsfe: MeasureSpec = {
   id: 'DSF-E',

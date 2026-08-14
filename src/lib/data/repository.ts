@@ -102,7 +102,7 @@ function makeJsonRepo<T>(collection: string): CollectionRepo<T> {
 let _kv: any = null;
 async function kvClient() {
   if (_kv) return _kv;
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+   
   const mod = await import('@vercel/kv');
   _kv = mod.kv;
   return _kv;
@@ -158,7 +158,7 @@ function fsDb(): Promise<any> {
   if (_fsInit) return _fsInit;
   _fsInit = (async () => {
     // firebase-admin is CJS; normalize the dynamic-import interop shape.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     const mod: any = await import('firebase-admin');
     const admin: any = mod.default ?? mod;
     if (admin.apps.length === 0) {
@@ -271,10 +271,6 @@ export async function writeSeedSummary(s: SeedSummary): Promise<void> {
     return;
   }
   await writeJsonFile(SEED_SUMMARY_FILE, s);
-}
-
-export async function isSeeded(): Promise<boolean> {
-  return (await readSeedSummary()) !== null;
 }
 
 export function activeBackend(): Backend {

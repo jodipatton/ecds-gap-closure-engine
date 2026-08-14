@@ -37,7 +37,6 @@ export function LogoMark({
             .join('')}
         </span>
       ) : (
-        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={logoSrc}
           alt={`${name} logo`}

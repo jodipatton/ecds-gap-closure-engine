@@ -8,20 +8,13 @@
 
 import { repos, readSeedSummary } from '@/lib/data/repository';
 import { computeMemberRisk } from '@/lib/risk/raf';
+import { hash01 as hash } from '@/lib/shared/hash';
+import { groupBy } from '@/lib/shared/collections';
 import type { Claim, Condition, ValueContract, VbcModel } from '@/lib/data/types';
 
 const PAYER_NAME = 'Fallon Health';
 const MEASURE_POOL = ['BCS', 'COL', 'WCV', 'CIS', 'HBD', 'CBP', 'DSF-E'];
 const MODELS: VbcModel[] = ['P4P', 'Shared Savings', 'Full Risk'];
-
-function hash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return (h >>> 0) / 4294967296;
-}
 
 export async function ensureContracts(): Promise<ValueContract[]> {
   const existing = await repos.contracts.list();
@@ -85,17 +78,6 @@ export interface ContractValue {
   totalValueAtStake: number;
 }
 
-function indexList<T>(arr: T[], key: (t: T) => string): Map<string, T[]> {
-  const m = new Map<string, T[]>();
-  for (const x of arr) {
-    const k = key(x);
-    const l = m.get(k) ?? [];
-    l.push(x);
-    m.set(k, l);
-  }
-  return m;
-}
-
 export async function valueForContract(contract: ValueContract): Promise<ContractValue> {
   const [attribution, gaps, results, members, conditions, claims, summary] = await Promise.all([
     repos.attribution.list(),
@@ -127,8 +109,8 @@ export async function valueForContract(contract: ValueContract): Promise<Contrac
   const avgRatePct = denom === 0 ? 0 : Number(((num / denom) * 100).toFixed(1));
 
   const memberById = new Map(members.map((m) => [m.id, m]));
-  const condByMember = indexList<Condition>(conditions, (c) => c.memberId);
-  const claimByMember = indexList<Claim>(claims, (c) => c.memberId);
+  const condByMember = groupBy<Condition, string>(conditions, (c) => c.memberId);
+  const claimByMember = groupBy<Claim, string>(claims, (c) => c.memberId);
   let riskRecapture = 0;
   for (const id of panelMemberIds) {
     const m = memberById.get(id);

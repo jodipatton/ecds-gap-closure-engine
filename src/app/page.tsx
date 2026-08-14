@@ -9,6 +9,7 @@ import { allContractValues } from '@/lib/contracts/vbc';
 import { buildRoster } from '@/lib/rosters/roster';
 import { ensureSeedAudit, listAudit } from '@/lib/audit/audit';
 import { campaignProgress } from '@/lib/outreach/campaigns';
+import { denominator, gapValue } from '@/lib/analytics/projection';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,18 +51,15 @@ export default async function Home() {
   const hasResults = results.length > 0;
   const my = summary?.measurementYear ?? new Date().getFullYear();
 
-  const totalEligible = results.reduce((s, r) => s + r.eligiblePopulation, 0);
+  const totalDenominator = results.reduce((s, r) => s + denominator(r), 0);
   const totalNumerator = results.reduce((s, r) => s + r.combinedNumerator, 0);
   const totalGaps = gaps.filter((g) => g.status.startsWith('open-')).length;
-  const overallRate = totalEligible === 0 ? 0 : (totalNumerator / totalEligible) * 100;
+  const overallRate = totalDenominator === 0 ? 0 : (totalNumerator / totalDenominator) * 100;
 
   const risk = planRiskSummary(members, conditions, claims, my);
   const contractValues = hasResults ? await allContractValues() : [];
   const contractValueAtStake = contractValues.reduce((s, v) => s + v.totalValueAtStake, 0);
-  const dollarOpportunity = results.reduce(
-    (s, r) => s + r.gapCount * (r.dataTier === 'claims-only' ? 220 : r.dataTier === 'uscdi-v3' ? 380 : 520),
-    0
-  );
+  const dollarOpportunity = results.reduce((s, r) => s + r.gapCount * gapValue(r.dataTier), 0);
   const auditVerified = audit.filter((a) => a.psvStatus === 'verified').length;
   const campaignAvg =
     campaigns.length === 0
@@ -71,10 +69,7 @@ export default async function Home() {
         );
 
   const dollarRanked = results
-    .map((r) => ({
-      ...r,
-      impact: r.gapCount * (r.dataTier === 'claims-only' ? 220 : r.dataTier === 'uscdi-v3' ? 380 : 520)
-    }))
+    .map((r) => ({ ...r, impact: r.gapCount * gapValue(r.dataTier) }))
     .sort((a, b) => b.impact - a.impact)
     .slice(0, 5);
 
