@@ -5,6 +5,12 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '2mb'
     }
+  },
+  async redirects() {
+    return [
+      { source: '/engagement', destination: '/outreach/queue', permanent: false },
+      { source: '/campaigns', destination: '/outreach', permanent: false }
+    ];
   }
 };
 

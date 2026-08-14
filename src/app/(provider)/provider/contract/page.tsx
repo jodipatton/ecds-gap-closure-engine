@@ -87,7 +87,7 @@ export default async function ProviderContractPage() {
             Open my worklist roster →
           </Link>
           <Link
-            href="/provider/connect/status"
+            href="/provider/connect"
             className="rounded border border-slate-300 px-4 py-2 text-sm font-medium"
           >
             Pull clinical data to close gaps

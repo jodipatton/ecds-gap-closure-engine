@@ -43,7 +43,7 @@ export async function recommendedActions(limit = 5): Promise<RecommendedAction[]
       title: `Pull clinical data from ${topPlatform.platform} practices`,
       detail: `${topPlatform.platform} covers ${topPlatform.openGaps} open gaps across ${topPlatform.orgCount} orgs — much of it closeable with a clinical-data sync.`,
       estimatedValue: topPlatform.openGaps * gapValue('uscdi-v3'),
-      href: '/provider/connect/status'
+      href: '/provider/connect'
     });
   }
 
@@ -55,7 +55,7 @@ export async function recommendedActions(limit = 5): Promise<RecommendedAction[]
       title: `Engage ${engagement.length} queued members`,
       detail: `${noVisit} have had no visit this measurement year. Create a campaign to drive scheduling.`,
       estimatedValue: engagement.length * 120,
-      href: '/campaigns'
+      href: '/outreach'
     });
   }
 

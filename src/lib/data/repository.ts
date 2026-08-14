@@ -17,7 +17,6 @@ import type {
   AuditEvent,
   Campaign,
   Claim,
-  FeedbackEntry,
   Condition,
   DocumentReference,
   EhrConnection,
@@ -200,8 +199,7 @@ export const repos = {
   campaigns: makeRepo<Campaign>('campaigns'),
   payerAccess: makeRepo<PayerAccessGrant>('payerAccess'),
   auditEvents: makeRepo<AuditEvent>('auditEvents'),
-  contracts: makeRepo<ValueContract>('valueContracts'),
-  feedback: makeRepo<FeedbackEntry>('feedback')
+  contracts: makeRepo<ValueContract>('valueContracts')
 };
 
 // ---- Seed summary (single object, not a collection) -----------------------

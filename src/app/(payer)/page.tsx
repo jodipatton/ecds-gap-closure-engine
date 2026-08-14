@@ -90,14 +90,14 @@ export default async function Home() {
       accent: 'sky' as const
     },
     {
-      href: '/engagement',
+      href: '/outreach/queue',
       label: 'Engagement queue',
       metric: `${engagement.length}`,
       sub: 'No visit · no PCP · gap-closeable',
       accent: 'rose' as const
     },
     {
-      href: '/campaigns',
+      href: '/outreach',
       label: 'Outreach campaigns',
       metric: `${campaigns.length}`,
       sub: campaigns.length ? `${campaignAvg}% avg closed` : 'None yet',

@@ -1,5 +1,8 @@
-import { repos } from '@/lib/data/repository';
+import Link from 'next/link';
+import { getSnapshot } from '@/lib/data/snapshot';
 import { Card, Pill } from '@/components/ui';
+import { MEASURES } from '@/lib/hedis/measures';
+import { CampaignCreator } from '@/components/outreach/CampaignCreator';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,39 +18,37 @@ const REASON_LABELS = {
   'gap-closeable': 'Gap-closeable'
 } as const;
 
-export default async function EngagementPage() {
-  const queue = await repos.engagement.list();
-  const grouped: Record<string, typeof queue> = {};
-  for (const e of queue) {
-    grouped[e.queueReason] ??= [];
-    grouped[e.queueReason].push(e);
-  }
+export default async function OutreachQueuePage() {
+  const { engagement: queue } = await getSnapshot();
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Engagement queue</h1>
-        <p className="text-sm text-slate-600 mt-1 max-w-3xl">
+        <h1 className="text-2xl font-semibold text-ink">Outreach queue</h1>
+        <p className="mt-1 max-w-3xl text-sm text-slate-600">
           Members routed for outreach. Provider recommendations are filtered by specialty and synthetic
-          distance, prioritizing in-network providers with FHIR-ready EHRs. Incentive eligibility is
-          illustrative.
+          distance, prioritizing in-network providers with FHIR-ready EHRs. Start a campaign from a
+          measure or queue-reason slice below.
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        {(['no-visit', 'no-pcp', 'gap-closeable'] as const).map((r) => (
-          <Card key={r}>
-            <div className="text-xs text-slate-500">{REASON_LABELS[r]}</div>
-            <div className="text-2xl font-semibold mt-1">{grouped[r]?.length ?? 0}</div>
-          </Card>
-        ))}
-      </div>
+      <Card>
+        <h2 className="mb-3 font-semibold text-ink">New campaign</h2>
+        {queue.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            The queue is empty — run analytics from the{' '}
+            <Link href="/" className="text-accent hover:underline">dashboard</Link> first.
+          </p>
+        ) : (
+          <CampaignCreator measureIds={MEASURES.map((m) => m.id)} />
+        )}
+      </Card>
 
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs uppercase tracking-wide text-slate-500 border-b">
+              <tr className="border-b text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="py-2 pr-4">Member</th>
                 <th className="py-2 pr-4">Reason</th>
                 <th className="py-2 pr-4">Outreach</th>
@@ -58,13 +59,13 @@ export default async function EngagementPage() {
             </thead>
             <tbody>
               {queue.length === 0 && (
-                <tr><td colSpan={6} className="py-6 text-slate-500">Queue empty (run the engine).</td></tr>
+                <tr><td colSpan={6} className="py-6 text-slate-500">Queue empty (run analytics first).</td></tr>
               )}
               {queue.slice(0, 250).map((e) => (
-                <tr key={e.memberId} className="border-b last:border-0 align-top">
+                <tr key={e.memberId} className="border-b align-top last:border-0">
                   <td className="py-2 pr-4">
                     <div>{e.memberName}</div>
-                    <div className="text-xs text-slate-400">{e.memberId}</div>
+                    <div className="font-mono text-xs text-slate-400">{e.memberId}</div>
                   </td>
                   <td className="py-2 pr-4"><Pill color={REASON_COLORS[e.queueReason]}>{REASON_LABELS[e.queueReason]}</Pill></td>
                   <td className="py-2 pr-4 text-xs">{e.outreachType}</td>

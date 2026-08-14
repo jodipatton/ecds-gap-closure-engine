@@ -264,22 +264,6 @@ export interface CampaignMember {
   lastTouchedAt: ISODate | null;
 }
 
-// ---- Per-page feedback ----------------------------------------------------
-
-export interface FeedbackEntry {
-  id: string;
-  page: string; // pathname the feedback is about
-  pageTitle: string;
-  createdAt: ISODate;
-  role: string;
-  valuable: 'yes' | 'somewhat' | 'not-yet' | 'unsure';
-  rating: number; // 1–5 overall
-  whoWouldUse: string;
-  improvements: string;
-  wouldChampion: boolean;
-  email?: string;
-}
-
 // ---- Clinical data provenance / PSV audit trail ---------------------------
 
 export type AuditSource = 'ehr-sync' | 'payer-access-pull' | 'seed';

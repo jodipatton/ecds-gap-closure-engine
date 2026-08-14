@@ -221,7 +221,7 @@ export function ConnectionWizard(props: WizardProps) {
           <p className="mt-1 text-sm text-emerald-700">
             Heading to the connection status dashboard…
           </p>
-          <a href={`/provider/connect/status?npi=${props.providerNpi}`} className="mt-3 inline-flex rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white">
+          <a href={`/provider/connect?npi=${props.providerNpi}`} className="mt-3 inline-flex rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white">
             View connection status
           </a>
         </div>

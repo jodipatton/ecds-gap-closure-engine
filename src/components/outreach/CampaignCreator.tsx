@@ -32,7 +32,7 @@ export function CampaignCreator({ measureIds }: { measureIds: string[] }) {
       if (!r.ok || !j.ok) throw new Error(j.error ?? 'Failed');
       setMsg(`Created "${j.campaign.name}" with ${j.campaign.members.length} members.`);
       setName('');
-      start(() => router.refresh());
+      start(() => router.push(`/outreach/campaigns/${encodeURIComponent(j.campaign.id)}`));
     } catch (err: any) {
       setMsg(`Error: ${err.message}`);
     } finally {

@@ -1,11 +1,11 @@
-'use client';
-
-import { useState } from 'react';
-import { LogoMark } from '@/components/LogoMark';
-
-// Brand marks. Logos are referenced from publicly hosted assets / a logo CDN
-// (nothing trademarked is bundled); a styled text wordmark is the fallback.
-// "For demo purposes only" is shown on every page.
+// Brand marks. Logo assets are served locally from public/logos (fetched once
+// at setup; nothing trademarked is bundled beyond demo use). Server-component
+// safe — no client state.
+//
+// Tenant rule: the shell logo tells you whose product you're in. The payer
+// console shows 1upHealth alone in the sidebar and Fallon once in the top
+// bar; the provider portal shows Reliant alone in its header with 1upHealth
+// demoted to a "Powered by" footer.
 
 export function OneUpWordmark({
   variant = 'light',
@@ -27,13 +27,7 @@ export function OneUpWordmark({
   );
 }
 
-// Official 1upHealth wordmark (publicly hosted asset). The "inverted" mark is
-// the white version 1upHealth uses on dark backgrounds — matching how it sits
-// in our navy sidebar. Falls back to a styled text wordmark if the asset is
-// unavailable.
-const ONEUP_LOGO_INVERTED =
-  'https://1up.health/wp-content/uploads/2023/05/1uphealth-Web_Logo_Inverted_RGB_HIGHRES.png';
-
+/** White 1upHealth logo for dark backgrounds (the payer sidebar). */
 export function OneUpLogo({
   withConsole = true,
   height = 26
@@ -41,53 +35,48 @@ export function OneUpLogo({
   withConsole?: boolean;
   height?: number;
 }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) {
-    return <OneUpWordmark variant="dark" withConsole={withConsole} />;
-  }
   return (
     <span className="inline-flex items-center gap-2">
       <img
-        src={ONEUP_LOGO_INVERTED}
+        src="/logos/1uphealth-inverted.png"
         alt="1upHealth"
         style={{ height }}
         className="object-contain"
-        onError={() => setFailed(true)}
       />
-      {withConsole && (
-        <span className="text-sm font-medium text-slate-400">Console</span>
+      {withConsole && <span className="text-sm font-medium text-slate-400">Console</span>}
+    </span>
+  );
+}
+
+/** Payer tenant lockup for the console top bar. */
+export function PayerLockup() {
+  return (
+    <span className="inline-flex items-center gap-3">
+      <img src="/logos/fallon.png" alt="Fallon Health" className="h-8 object-contain" />
+      <span className="leading-tight">
+        <span className="block text-sm font-semibold text-ink">Fallon Health</span>
+        <span className="block text-[11px] uppercase tracking-wide text-slate-500">Medicare Advantage · payer tenant</span>
+      </span>
+    </span>
+  );
+}
+
+/** Provider tenant mark (initials tile — no public logo asset). */
+export function ProviderMark({ height = 36, withName = true }: { height?: number; withName?: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-3">
+      <span
+        className="grid place-items-center rounded-md text-sm font-bold text-white"
+        style={{ backgroundColor: '#1F6FEB', height, width: height }}
+      >
+        RM
+      </span>
+      {withName && (
+        <span className="leading-tight">
+          <span className="block text-sm font-semibold text-ink">Reliant Medical Group</span>
+          <span className="block text-[11px] uppercase tracking-wide text-slate-500">Provider portal</span>
+        </span>
       )}
-    </span>
-  );
-}
-
-// Payer tenant for the plan-facing tools.
-export function PayerBadge({ height = 40 }: { height?: number }) {
-  return (
-    <span className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2">
-      <LogoMark
-        domain="fallonhealth.org"
-        src="https://fallonhealth.org/-/media/Images/FCHP/Home/fallon-health-web.ashx?h=100&iar=0&w=364&hash=CD9E3CC200C69100140A0FF934958770BFB7F628"
-        name="Fallon Health"
-        role="Payer"
-        accent="#0F766E"
-        height={height}
-      />
-    </span>
-  );
-}
-
-// Provider tenant for the provider portal.
-export function ProviderBadge({ height = 40 }: { height?: number }) {
-  return (
-    <span className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2">
-      <LogoMark
-        domain="reliantmedicalgroup.org"
-        name="Reliant Medical Group"
-        role="Provider network"
-        accent="#1F6FEB"
-        height={height}
-      />
     </span>
   );
 }

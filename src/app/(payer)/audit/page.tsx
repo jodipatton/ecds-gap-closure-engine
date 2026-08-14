@@ -30,7 +30,7 @@ export default async function AuditPage() {
           Every clinical-data acquisition (EHR sync, Provider Access API pull) is logged with its
           source system, attributed provider, resource counts, and a Primary Source Verification
           determination. Run an{' '}
-          <Link href="/provider/connect/status" className="text-accent hover:underline">
+          <Link href="/provider/connect" className="text-accent hover:underline">
             EHR clinical-data pull
           </Link>{' '}
           or a{' '}
