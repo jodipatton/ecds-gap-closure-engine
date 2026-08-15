@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { Gauge } from 'lucide-react';
+import { FileText, FlaskConical, Gauge, Pill, Receipt, Syringe } from 'lucide-react';
+import { DATA_NEEDS, type ElementKind } from '@/lib/hedis/dataNeeds';
 import { getSnapshot } from '@/lib/data/snapshot';
 import { Card, CardHeader, EmptyState, ButtonLink, PageHeader, TierBadge } from '@/components/ui';
 import { AgePyramid, BulletBar, type PyramidBand } from '@/components/charts';
@@ -8,6 +9,14 @@ import { ageOn } from '@/lib/shared/dates';
 import { money } from '@/lib/shared/format';
 
 export const dynamic = 'force-dynamic';
+
+const KIND_ICON: Record<ElementKind, { icon: typeof Receipt; label: string }> = {
+  claims: { icon: Receipt, label: 'Claims' },
+  observation: { icon: FlaskConical, label: 'Labs & vitals (FHIR Observation)' },
+  medication: { icon: Pill, label: 'Medications (MedicationRequest)' },
+  document: { icon: FileText, label: 'Documents (CCDA)' },
+  immunization: { icon: Syringe, label: 'Immunizations (CVX)' }
+};
 
 const TIERS: Array<['claims-only' | 'uscdi-v3' | 'ccda', string]> = [
   ['claims-only', 'Tier 1 — Claims only'],
@@ -71,7 +80,15 @@ export default async function MeasuresPage() {
                           <div className="font-medium text-ink">{r.measureName}</div>
                           <span className="text-lg font-semibold tabular-nums text-ink">{r.rate.toFixed(1)}%</span>
                         </div>
-                        <div className="mt-0.5 text-xs text-slate-500">{r.domain}</div>
+                        <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
+                          {r.domain}
+                          <span className="inline-flex items-center gap-1 text-slate-400">
+                            {[...new Set(DATA_NEEDS[r.measureId]?.elements.map((e) => e.kind) ?? [])].map((k) => {
+                              const { icon: Icon, label } = KIND_ICON[k];
+                              return <Icon key={k} size={12.5} strokeWidth={1.75} aria-label={label} />;
+                            })}
+                          </span>
+                        </div>
                         <div className="mt-3">
                           <BulletBar value={r.rate} target={target} />
                           <div className="mt-1 flex justify-between text-[11px] text-slate-400">

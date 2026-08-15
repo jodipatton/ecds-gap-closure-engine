@@ -5,6 +5,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   ClipboardList,
+  Database,
   FileSignature,
   FileText,
   Gauge,
@@ -42,6 +43,7 @@ export const PAYER_NAV: NavSection[] = [
     section: 'Quality',
     items: [
       { href: '/measures', label: 'Measures', title: 'HEDIS measures', icon: Gauge },
+      { href: '/data-map', label: 'Data coverage', title: 'Data coverage map', icon: Database },
       { href: '/ecds-report', label: 'ECDS report', title: 'ECDS report', icon: FileText },
       { href: '/audit', label: 'PSV audit trail', title: 'PSV audit trail', icon: ShieldCheck }
     ]

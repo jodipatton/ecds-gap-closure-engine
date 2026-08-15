@@ -156,7 +156,7 @@ export default async function Home() {
           <Card>
             <CardHeader
               title="Where the denominator stands"
-              action={<Link href="/measures" className="text-sm text-accent hover:underline">By measure →</Link>}
+              action={<Link href="/data-map" className="text-sm text-accent hover:underline">Data coverage map →</Link>}
             />
             <StackedBar
               height={16}

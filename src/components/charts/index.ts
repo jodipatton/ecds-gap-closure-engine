@@ -9,3 +9,5 @@ export { Sparkline } from './Sparkline';
 export { Scatter, type ScatterPoint } from './Scatter';
 export { Histogram, type HistogramMarker } from './Histogram';
 export { AgePyramid, type PyramidBand } from './AgePyramid';
+export { Waffle, type WaffleUnit } from './Waffle';
+export { Waterfall, type WaterfallStep } from './Waterfall';
