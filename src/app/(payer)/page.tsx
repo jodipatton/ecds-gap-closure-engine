@@ -3,15 +3,17 @@ import { Activity, ArrowUpRight } from 'lucide-react';
 import { activeBackend } from '@/lib/data/repository';
 import { getRisk, getSnapshot } from '@/lib/data/snapshot';
 import { Card, CardHeader, StatTile } from '@/components/ui';
-import { BarList, BulletBar } from '@/components/charts';
+import { BarList, BulletBar, StackedBar, TrendLine, GAP_STATUS_COLORS, GAP_STATUS_LABELS } from '@/components/charts';
 import { SeedAndRun } from '@/components/SeedAndRun';
 import { AssistantPanel } from '@/components/assistant/AssistantPanel';
 import { ehrPlatformGapImpact } from '@/lib/hedis/engine';
 import { recommendedActions } from '@/lib/agent/recommendations';
 import { allContractValues } from '@/lib/contracts/vbc';
 import { ensureSeedAudit } from '@/lib/audit/audit';
-import { denominator, gapValue, measureTarget } from '@/lib/analytics/projection';
+import { denominator, gapValue, measureTarget, rateTrend } from '@/lib/analytics/projection';
 import { money } from '@/lib/shared/format';
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export const dynamic = 'force-dynamic';
 
@@ -60,6 +62,29 @@ export default async function Home() {
 
   const recentAudit = [...snap.auditEvents].sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 5);
   const heroPlatform = ehrImpact.find((r) => r.platform !== 'No PCP' && r.platform !== 'Unconnected');
+
+  // Plan-wide denominator status counts.
+  const statusCounts: Record<string, number> = {};
+  for (const g of gaps) statusCounts[g.status] = (statusCounts[g.status] ?? 0) + 1;
+
+  // Denominator-weighted overall rate trajectory across all measures.
+  const trendParts = results.map((r) => ({ denom: denominator(r), ...rateTrend(r) }));
+  const overallPoints =
+    totalDenominator === 0
+      ? []
+      : Array.from({ length: 12 }, (_, i) =>
+          Number((trendParts.reduce((s, t) => s + t.points[i] * t.denom, 0) / totalDenominator).toFixed(1))
+        );
+  const overallProjected =
+    totalDenominator === 0
+      ? 0
+      : Number((trendParts.reduce((s, t) => s + t.projectedEoy * t.denom, 0) / totalDenominator).toFixed(1));
+  const overallTarget =
+    totalDenominator === 0
+      ? 0
+      : Number(
+          (results.reduce((s, r) => s + measureTarget(r.measureId) * denominator(r), 0) / totalDenominator).toFixed(1)
+        );
 
   return (
     <div className="space-y-8">
@@ -124,6 +149,43 @@ export default async function Home() {
             Audit trail →
           </Link>
         </div>
+      )}
+
+      {hasResults && (
+        <section className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader
+              title="Where the denominator stands"
+              action={<Link href="/measures" className="text-sm text-accent hover:underline">By measure →</Link>}
+            />
+            <StackedBar
+              height={16}
+              segments={(['closed-claims', 'closed-clinical', 'open-needs-clinical', 'open-needs-document'] as const).map(
+                (s) => ({ label: GAP_STATUS_LABELS[s], value: statusCounts[s] ?? 0, color: GAP_STATUS_COLORS[s] })
+              )}
+            />
+            <p className="mt-3 text-xs text-slate-500">
+              The amber and rose segments are members whose care may already have happened — the plan
+              just can&apos;t see it without clinical data.
+            </p>
+          </Card>
+          <Card>
+            <CardHeader title="Overall rate trajectory" />
+            {overallPoints.length > 0 && (
+              <TrendLine
+                points={overallPoints}
+                labels={MONTHS}
+                projected={overallProjected}
+                target={overallTarget}
+                height={150}
+              />
+            )}
+            <p className="mt-1 text-xs text-slate-500">
+              Denominator-weighted across all 10 measures; dashed = end-of-year projection, tick line =
+              weighted target.
+            </p>
+          </Card>
+        </section>
       )}
 
       {hasResults && (

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getSnapshot } from '@/lib/data/snapshot';
 import { Card, DataTable, type Column } from '@/components/ui';
+import { StackedBar, CHART } from '@/components/charts';
 import { campaignProgress } from '@/lib/outreach/campaigns';
 import { ContactControls } from '@/components/outreach/ContactControls';
 import type { CampaignMember } from '@/lib/data/types';
@@ -34,17 +35,15 @@ export default async function CampaignPage({ params }: { params: { id: string } 
       </div>
 
       <Card>
-        <div className="mb-1 flex justify-between text-xs text-slate-500">
-          <span>closed {p.byStatus.closed}</span>
-          <span>scheduled {p.byStatus.scheduled}</span>
-          <span>contacted {p.byStatus.contacted}</span>
-          <span>not contacted {p.byStatus['not-contacted']}</span>
-        </div>
-        <div className="flex h-2.5 w-full overflow-hidden rounded bg-slate-100">
-          <div className="bg-emerald-500" style={{ width: `${pctOf(p.byStatus.closed, p.total)}%` }} />
-          <div className="bg-sky-400" style={{ width: `${pctOf(p.byStatus.scheduled, p.total)}%` }} />
-          <div className="bg-amber-400" style={{ width: `${pctOf(p.byStatus.contacted, p.total)}%` }} />
-        </div>
+        <StackedBar
+          height={14}
+          segments={[
+            { label: 'Closed', value: p.byStatus.closed, color: CHART.good },
+            { label: 'Scheduled', value: p.byStatus.scheduled, color: CHART.accent },
+            { label: 'Contacted', value: p.byStatus.contacted, color: CHART.attention },
+            { label: 'Not contacted', value: p.byStatus['not-contacted'], color: CHART.track }
+          ]}
+        />
       </Card>
 
       <Card>
@@ -82,8 +81,4 @@ export default async function CampaignPage({ params }: { params: { id: string } 
       </Card>
     </div>
   );
-}
-
-function pctOf(n: number, total: number) {
-  return total === 0 ? 0 : Math.round((n / total) * 100);
 }

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getSnapshot } from '@/lib/data/snapshot';
 import { Card, Pill } from '@/components/ui';
+import { StackedBar, CHART } from '@/components/charts';
 import { campaignProgress } from '@/lib/outreach/campaigns';
 
 export const dynamic = 'force-dynamic';
@@ -76,10 +77,16 @@ export default async function OutreachPage() {
                         <Pill color={p.closedPct >= 50 ? 'green' : 'amber'}>{p.closedPct}% closed</Pill>
                       </div>
                     </div>
-                    <div className="mt-3 flex h-2 w-full overflow-hidden rounded bg-slate-100">
-                      <div className="bg-emerald-500" style={{ width: `${pctOf(p.byStatus.closed, p.total)}%` }} />
-                      <div className="bg-sky-400" style={{ width: `${pctOf(p.byStatus.scheduled, p.total)}%` }} />
-                      <div className="bg-amber-400" style={{ width: `${pctOf(p.byStatus.contacted, p.total)}%` }} />
+                    <div className="mt-3">
+                      <StackedBar
+                        height={10}
+                        segments={[
+                          { label: 'Closed', value: p.byStatus.closed, color: CHART.good },
+                          { label: 'Scheduled', value: p.byStatus.scheduled, color: CHART.accent },
+                          { label: 'Contacted', value: p.byStatus.contacted, color: CHART.attention },
+                          { label: 'Not contacted', value: p.byStatus['not-contacted'], color: CHART.track }
+                        ]}
+                      />
                     </div>
                   </Card>
                 </Link>
@@ -90,8 +97,4 @@ export default async function OutreachPage() {
       </div>
     </div>
   );
-}
-
-function pctOf(n: number, total: number) {
-  return total === 0 ? 0 : Math.round((n / total) * 100);
 }

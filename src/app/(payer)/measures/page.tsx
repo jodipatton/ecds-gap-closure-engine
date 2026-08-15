@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { Gauge } from 'lucide-react';
 import { getSnapshot } from '@/lib/data/snapshot';
-import { Card, EmptyState, ButtonLink, PageHeader, TierBadge } from '@/components/ui';
-import { BulletBar } from '@/components/charts';
+import { Card, CardHeader, EmptyState, ButtonLink, PageHeader, TierBadge } from '@/components/ui';
+import { AgePyramid, BulletBar, type PyramidBand } from '@/components/charts';
 import { gapValue, measureTarget } from '@/lib/analytics/projection';
+import { ageOn } from '@/lib/shared/dates';
 import { money } from '@/lib/shared/format';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,26 @@ const TIERS: Array<['claims-only' | 'uscdi-v3' | 'ccda', string]> = [
 ];
 
 export default async function MeasuresPage() {
-  const { results } = await getSnapshot();
+  const snap = await getSnapshot();
+  const { results } = snap;
+
+  // Covered population by age band × sex — why the denominators look the way
+  // they do (kids drive CIS/WCV, 45+ drives COL/BCS, 65+ drives risk).
+  const ref = `${snap.measurementYear}-12-31`;
+  const BAND_SIZE = 10;
+  const bandMap = new Map<number, { left: number; right: number }>();
+  for (const m of snap.members) {
+    const band = Math.min(8, Math.floor(ageOn(m.birthDate, ref) / BAND_SIZE));
+    const cur = bandMap.get(band) ?? { left: 0, right: 0 };
+    if (m.sex === 'F') cur.left++;
+    else cur.right++;
+    bandMap.set(band, cur);
+  }
+  const bands: PyramidBand[] = Array.from({ length: 9 }, (_, i) => ({
+    band: i === 8 ? '80+' : `${i * BAND_SIZE}–${i * BAND_SIZE + 9}`,
+    left: bandMap.get(i)?.left ?? 0,
+    right: bandMap.get(i)?.right ?? 0
+  })).reverse();
 
   return (
     <div className="space-y-8">
@@ -78,6 +98,22 @@ export default async function MeasuresPage() {
             </section>
           );
         })
+      )}
+
+      {snap.members.length > 0 && (
+        <Card>
+          <CardHeader
+            title="Covered population"
+            action={<span className="text-xs text-slate-500">{snap.members.length} members · MY {snap.measurementYear}</span>}
+          />
+          <div className="mx-auto max-w-xl">
+            <AgePyramid bands={bands} leftLabel="Female" rightLabel="Male" />
+          </div>
+          <p className="mt-3 text-xs text-slate-500">
+            The age mix explains the denominators above: the pediatric bands drive CIS and WCV, the 45–75
+            bands drive COL and BCS, and the 65+ bands carry most of the RAF opportunity.
+          </p>
+        </Card>
       )}
     </div>
   );

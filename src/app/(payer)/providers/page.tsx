@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Network } from 'lucide-react';
 import { getSnapshot } from '@/lib/data/snapshot';
 import { Badge, Card, CardHeader, DataTable, PageHeader, type Column } from '@/components/ui';
-import { BarList } from '@/components/charts';
+import { BarList, Scatter, CHART } from '@/components/charts';
 import { ehrPlatformGapImpact } from '@/lib/hedis/engine';
 import { gapValue } from '@/lib/analytics/projection';
 import { money } from '@/lib/shared/format';
@@ -130,6 +130,34 @@ export default async function ProvidersPage() {
           />
         </Card>
       )}
+
+      <Card>
+        <CardHeader title="Which practices are worth connecting first" />
+        <Scatter
+          xLabel="attributed panel size"
+          yLabel="open gaps"
+          points={snap.providers
+            .filter((p) => p.memberCount > 0 || (orgGaps[p.npi] ?? 0) > 0)
+            .map((p) => ({
+              label: p.organizationName,
+              x: p.memberCount,
+              y: orgGaps[p.npi] ?? 0,
+              color: connectedNpis.has(p.npi) ? CHART.good : p.fhirEndpointUrl ? CHART.attention : CHART.neutral,
+              hint: `${p.ehrPlatform ?? 'unvalidated EHR'} · ${
+                connectedNpis.has(p.npi) ? 'connected' : p.fhirEndpointUrl ? 'FHIR-ready, not connected' : 'no endpoint'
+              }`
+            }))}
+          legend={[
+            { label: 'Connected', color: CHART.good },
+            { label: 'FHIR-ready · not connected', color: CHART.attention },
+            { label: 'No endpoint', color: CHART.neutral }
+          ]}
+        />
+        <p className="mt-2 text-xs text-slate-500">
+          Up and to the right = large panels carrying many open gaps. An amber dot there is the highest-yield
+          connection target — one clinical-data sync instead of member-by-member outreach.
+        </p>
+      </Card>
 
       <Card>
         <CardHeader title="Provider directory" />

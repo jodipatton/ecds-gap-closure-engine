@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { HeartPulse } from 'lucide-react';
 import { getRisk, getSnapshot } from '@/lib/data/snapshot';
 import { Badge, ButtonLink, Card, CardHeader, DataTable, EmptyState, PageHeader, StatTile, type Column } from '@/components/ui';
-import { BarList } from '@/components/charts';
+import { BarList, Histogram, CHART } from '@/components/charts';
 import { RAF_DOLLARS, type MemberRisk } from '@/lib/risk/raf';
 import { money } from '@/lib/shared/format';
 
@@ -122,20 +122,40 @@ export default async function RiskPage() {
         <StatTile label="Revenue opportunity" value={money(risk.totalRevenueOpportunity)} hint="annual, illustrative" />
       </section>
 
-      {hccRows.length > 0 && (
+      <section className="grid gap-6 md:grid-cols-2">
         <Card>
-          <CardHeader title="Top suspected HCCs by recapture value" />
-          <BarList
-            format={money}
-            rows={hccRows.map((h, i) => ({
-              label: `${h.hcc} · ${h.label}`,
-              value: h.dollars,
-              emphasized: i === 0,
-              hint: `${h.count} member${h.count > 1 ? 's' : ''}`
-            }))}
+          <CardHeader title="RAF score distribution" />
+          <Histogram
+            values={risk.members.map((m) => m.currentRaf)}
+            binSize={0.25}
+            min={0}
+            max={Math.max(2.5, ...risk.members.map((m) => m.currentRaf))}
+            format={(n) => n.toFixed(2)}
+            markers={[
+              { value: risk.avgCurrentRaf, label: 'avg current', color: '#0A1733' },
+              { value: risk.avgPotentialRaf, label: 'avg with recapture', color: CHART.recapture }
+            ]}
           />
+          <p className="mt-2 text-xs text-slate-500">
+            The gap between the two markers is the documentation opportunity — same members, same
+            conditions, better capture.
+          </p>
         </Card>
-      )}
+        {hccRows.length > 0 && (
+          <Card>
+            <CardHeader title="Top suspected HCCs by recapture value" />
+            <BarList
+              format={money}
+              rows={hccRows.map((h, i) => ({
+                label: `${h.hcc} · ${h.label}`,
+                value: h.dollars,
+                emphasized: i === 0,
+                hint: `${h.count} member${h.count > 1 ? 's' : ''}`
+              }))}
+            />
+          </Card>
+        )}
+      </section>
 
       <Card>
         <CardHeader title="Recapture worklist — top suspected RAF gaps" />
