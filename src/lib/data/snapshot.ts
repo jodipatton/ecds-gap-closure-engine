@@ -8,8 +8,15 @@
 // Write paths (seed, engine run, EHR sync) do NOT read through the snapshot —
 // they load via `repos` directly so they always see current state.
 
-import { cache } from 'react';
+import * as React from 'react';
 import { repos, readSeedSummary } from './repository';
+
+// React.cache exists only in the react-server build (what Next uses for
+// server components). Under vitest/tsx there is no request scope to memoize
+// against, so fall back to calling through uncached.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const cache: <T extends (...args: any[]) => any>(fn: T) => T =
+  (React as { cache?: <T>(fn: T) => T }).cache ?? ((fn) => fn);
 import { groupBy, keyBy } from '@/lib/shared/collections';
 import { planRiskSummary } from '@/lib/risk/raf';
 import type {

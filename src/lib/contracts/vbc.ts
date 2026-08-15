@@ -8,12 +8,16 @@
 
 import { repos, readSeedSummary } from '@/lib/data/repository';
 import { getSnapshot, type Snapshot } from '@/lib/data/snapshot';
+import { MEASURES } from '@/lib/hedis/measures';
 import { computeMemberRisk } from '@/lib/risk/raf';
 import { hash01 as hash } from '@/lib/shared/hash';
 import type { ValueContract, VbcModel } from '@/lib/data/types';
 
 const PAYER_NAME = 'Fallon Health';
-const MEASURE_POOL = ['BCS', 'COL', 'WCV', 'CIS', 'HBD', 'CBP', 'DSF-E'];
+// Contracts scope non-CCDA measures (Tier 3 gaps aren't incentive-eligible).
+// Derived from the registry; adding a measure deterministically reshuffles
+// the synthetic contracts, which is fine for a demo.
+const MEASURE_POOL = MEASURES.filter((m) => m.dataTier !== 'ccda').map((m) => m.id);
 const MODELS: VbcModel[] = ['P4P', 'Shared Savings', 'Full Risk'];
 
 export async function ensureContracts(): Promise<ValueContract[]> {
