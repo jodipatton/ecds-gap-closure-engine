@@ -3,8 +3,9 @@
 
 import type { MeasureSpec } from '@/lib/data/types';
 import { ageOn, claimsWithProc, myEnd, myStart } from '../util';
+import { CODES } from '../valuesets';
 
-const WCV_PROCS = ['99381', '99382', '99383', '99384', '99385', '99391', '99392', '99393', '99394', '99395'];
+const WCV_PROCS = CODES.well_visit_cpt;
 
 export const wcv: MeasureSpec = {
   id: 'WCV',

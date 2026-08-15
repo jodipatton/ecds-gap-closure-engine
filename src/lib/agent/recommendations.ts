@@ -2,7 +2,7 @@
 // should spend effort next. Reused by the dashboard card and the agent's
 // recommended_actions tool so the narrative matches the numbers.
 
-import { repos } from '@/lib/data/repository';
+import { getSnapshot } from '@/lib/data/snapshot';
 import { ehrPlatformGapImpact } from '@/lib/hedis/engine';
 import { gapValue } from '@/lib/analytics/projection';
 
@@ -15,11 +15,9 @@ export interface RecommendedAction {
 }
 
 export async function recommendedActions(limit = 5): Promise<RecommendedAction[]> {
-  const [results, engagement, ehrImpact] = await Promise.all([
-    repos.hedisResults.list(),
-    repos.engagement.list(),
-    ehrPlatformGapImpact()
-  ]);
+  const snap = await getSnapshot();
+  const { results, engagement } = snap;
+  const ehrImpact = await ehrPlatformGapImpact(snap);
 
   const actions: RecommendedAction[] = [];
 
@@ -44,8 +42,8 @@ export async function recommendedActions(limit = 5): Promise<RecommendedAction[]
       kind: 'ehr-connect',
       title: `Pull clinical data from ${topPlatform.platform} practices`,
       detail: `${topPlatform.platform} covers ${topPlatform.openGaps} open gaps across ${topPlatform.orgCount} orgs — much of it closeable with a clinical-data sync.`,
-      estimatedValue: topPlatform.openGaps * 380,
-      href: '/provider/connect/status'
+      estimatedValue: topPlatform.openGaps * gapValue('uscdi-v3'),
+      href: '/provider/connect'
     });
   }
 
@@ -57,7 +55,7 @@ export async function recommendedActions(limit = 5): Promise<RecommendedAction[]
       title: `Engage ${engagement.length} queued members`,
       detail: `${noVisit} have had no visit this measurement year. Create a campaign to drive scheduling.`,
       estimatedValue: engagement.length * 120,
-      href: '/campaigns'
+      href: '/outreach'
     });
   }
 

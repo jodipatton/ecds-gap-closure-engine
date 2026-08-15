@@ -124,11 +124,20 @@ export type GapStatus =
   | 'excluded'
   | 'not-eligible';
 
+/** What kind of clinical data would close a still-open gap. */
+export type MissingDataKind = 'observation' | 'document' | 'condition' | 'medication' | 'immunization';
+
+export interface MissingData {
+  kind: MissingDataKind;
+  description: string; // e.g., "FHIR Observation LOINC 4548-4"
+}
+
 export interface MeasureGap {
+  id: string; // `${measureId}:${memberId}`
   measureId: string;
   memberId: string;
   status: GapStatus;
-  missingDataElement?: string; // e.g., "FHIR Observation LOINC 4548-4"
+  missingDataElement?: string; // human-readable form of MissingData.description
   evidence?: string[]; // codes that contributed
   computedAt: ISODate;
 }
@@ -188,7 +197,7 @@ export interface MeasureSpec {
   satisfiedByClinical: (ctx: MeasureContext) => {
     ok: boolean;
     evidence: string[];
-    missingDataElement?: string;
+    missing?: MissingData;
   };
 }
 
@@ -240,6 +249,16 @@ export interface EhrConnection {
   setupCompletedBy: string | null;
   // Diagnostic detail rendered in the status dashboard
   lastErrorMessage?: string | null;
+  // Summary of the most recent clinical-data pull (drives the sync-result
+  // panel and the payer dashboard's "since last sync" chips).
+  lastSyncSummary?: {
+    at: ISODate;
+    recordsSynced: number;
+    gapsClosed: number;
+    dollarsUnlocked: number;
+    byMeasure: Array<{ measureId: string; closed: number }>;
+    rateShift: Array<{ measureId: string; before: number; after: number }>;
+  } | null;
 }
 
 // ---- Outreach campaigns ---------------------------------------------------
@@ -253,22 +272,6 @@ export interface CampaignMember {
   suggestedProviderName: string | null;
   contactStatus: ContactStatus;
   lastTouchedAt: ISODate | null;
-}
-
-// ---- Per-page feedback ----------------------------------------------------
-
-export interface FeedbackEntry {
-  id: string;
-  page: string; // pathname the feedback is about
-  pageTitle: string;
-  createdAt: ISODate;
-  role: string;
-  valuable: 'yes' | 'somewhat' | 'not-yet' | 'unsure';
-  rating: number; // 1–5 overall
-  whoWouldUse: string;
-  improvements: string;
-  wouldChampion: boolean;
-  email?: string;
 }
 
 // ---- Clinical data provenance / PSV audit trail ---------------------------

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button, Field, Input, Select } from '@/components/ui';
 
 const QUEUE_REASONS = [
   { value: 'no-visit', label: 'No visit in MY' },
@@ -32,7 +33,7 @@ export function CampaignCreator({ measureIds }: { measureIds: string[] }) {
       if (!r.ok || !j.ok) throw new Error(j.error ?? 'Failed');
       setMsg(`Created "${j.campaign.name}" with ${j.campaign.members.length} members.`);
       setName('');
-      start(() => router.refresh());
+      start(() => router.push(`/outreach/campaigns/${encodeURIComponent(j.campaign.id)}`));
     } catch (err: any) {
       setMsg(`Error: ${err.message}`);
     } finally {
@@ -48,66 +49,46 @@ export function CampaignCreator({ measureIds }: { measureIds: string[] }) {
   return (
     <div className="flex flex-wrap items-end gap-3">
       <Field label="Build from">
-        <select
+        <Select
           value={filterType}
           onChange={(e) => {
             const t = e.target.value as 'measure' | 'queue-reason';
             setFilterType(t);
             setFilterValue(t === 'measure' ? measureIds[0] ?? '' : QUEUE_REASONS[0].value);
           }}
-          className="rounded border border-slate-300 px-2 py-1.5 text-sm"
+          className="w-auto"
         >
           <option value="measure">Measure</option>
           <option value="queue-reason">Queue reason</option>
-        </select>
+        </Select>
       </Field>
       <Field label={filterType === 'measure' ? 'Measure' : 'Reason'}>
-        <select
-          value={filterValue}
-          onChange={(e) => setFilterValue(e.target.value)}
-          className="rounded border border-slate-300 px-2 py-1.5 text-sm"
-        >
+        <Select value={filterValue} onChange={(e) => setFilterValue(e.target.value)} className="w-auto">
           {options.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
-        </select>
+        </Select>
       </Field>
       <Field label="Channel">
-        <select
-          value={channel}
-          onChange={(e) => setChannel(e.target.value)}
-          className="rounded border border-slate-300 px-2 py-1.5 text-sm"
-        >
+        <Select value={channel} onChange={(e) => setChannel(e.target.value)} className="w-auto">
           <option value="phone">Phone</option>
           <option value="sms">SMS</option>
           <option value="mail">Mail</option>
-        </select>
+        </Select>
       </Field>
       <Field label="Name (optional)">
-        <input
+        <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Auto-named if blank"
-          className="rounded border border-slate-300 px-2 py-1.5 text-sm w-48"
+          className="w-48"
         />
       </Field>
-      <button
-        onClick={create}
-        disabled={busy || !filterValue}
-        className="rounded bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
+      <Button onClick={create} disabled={busy || !filterValue}>
         {busy ? 'Creating…' : 'Create campaign'}
-      </button>
+      </Button>
       {msg && <span className="text-xs text-slate-600">{msg}</span>}
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs uppercase tracking-wide text-slate-500">{label}</span>
-      {children}
-    </label>
-  );
-}

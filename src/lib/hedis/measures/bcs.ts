@@ -4,8 +4,9 @@
 
 import type { MeasureSpec } from '@/lib/data/types';
 import { ageOn, claimsWithProc, continuouslyEnrolledFor, myEnd, priorYearStart } from '../util';
+import { CODES } from '../valuesets';
 
-const MAMMO_PROCS = ['77067', '77066', '77065', 'G0202', 'G0204', 'G0206'];
+const MAMMO_PROCS = [...CODES.mammogram_cpt, ...CODES.mammogram_hcpcs];
 
 export const bcs: MeasureSpec = {
   id: 'BCS',
@@ -21,7 +22,7 @@ export const bcs: MeasureSpec = {
     return continuouslyEnrolledFor(ctx, -1, 0);
   },
   isExcluded(ctx) {
-    return ctx.conditions.some((c) => c.icd10 === 'Z90.13' && c.clinicalStatus === 'active');
+    return ctx.conditions.some((c) => CODES.mastectomy_icd10.includes(c.icd10) && c.clinicalStatus === 'active');
   },
   satisfiedByClaims(ctx) {
     const found = claimsWithProc(ctx, MAMMO_PROCS, priorYearStart(ctx.measurementYear), myEnd(ctx.measurementYear));

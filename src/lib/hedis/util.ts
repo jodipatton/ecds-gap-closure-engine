@@ -3,13 +3,7 @@
 
 import type { Claim, ISODate, MeasureContext } from '@/lib/data/types';
 
-export function ageOn(birthDate: ISODate, ref: ISODate): number {
-  const [by, bm, bd] = birthDate.split('-').map(Number);
-  const [ry, rm, rd] = ref.split('-').map(Number);
-  let a = ry - by;
-  if (rm < bm || (rm === bm && rd < bd)) a -= 1;
-  return a;
-}
+export { ageOn } from '@/lib/shared/dates';
 
 export function myStart(year: number): ISODate {
   return `${year}-01-01`;

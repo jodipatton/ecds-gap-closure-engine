@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { Button } from '@/components/ui';
 import { useRouter } from 'next/navigation';
 
 export function SeedAndRun({ seeded, hasResults }: { seeded: boolean; hasResults: boolean }) {
@@ -29,20 +30,19 @@ export function SeedAndRun({ seeded, hasResults }: { seeded: boolean; hasResults
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <button
+      <Button
+        variant="secondary"
         onClick={() => call('/api/seed', 'seed')}
         disabled={busy !== null}
-        className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
         {busy === 'seed' ? 'Seeding…' : seeded ? 'Re-seed synthetic data' : 'Seed synthetic data'}
-      </button>
-      <button
+      </Button>
+      <Button
         onClick={() => call('/api/engine', 'engine')}
         disabled={busy !== null || !seeded}
-        className="rounded bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
         {busy === 'engine' ? 'Running analytics…' : hasResults ? 'Re-run Analytics' : 'Run Analytics'}
-      </button>
+      </Button>
       {!seeded && <span className="text-xs text-slate-500">Seed first to enable the engine.</span>}
       {(msg || isPending) && <span className="text-xs text-slate-600">{msg ?? 'Refreshing…'}</span>}
     </div>

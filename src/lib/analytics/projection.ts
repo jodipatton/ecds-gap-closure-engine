@@ -3,6 +3,7 @@
 // computed HedisResult set — no I/O.
 
 import type { DataTier, HedisResult } from '@/lib/data/types';
+import { hash01 } from '@/lib/shared/hash';
 
 // Illustrative per-gap closure value by data tier (mirrors the dashboard's
 // dollar-opportunity heuristic — kept here so every surface agrees).
@@ -19,6 +20,14 @@ export function gapValue(tier: DataTier): number {
 /** Effective denominator for a measure (eligible minus exclusions). */
 export function denominator(r: HedisResult): number {
   return r.combinedNumerator + r.gapCount;
+}
+
+/**
+ * Illustrative plan-level target rate for a measure (70–85%), stable across
+ * renders. Contract-specific targets live on ValueContract.targetRatePct.
+ */
+export function measureTarget(measureId: string): number {
+  return 70 + Math.round(hash01(`target:${measureId}`) * 15);
 }
 
 /**
@@ -69,14 +78,7 @@ export function simulatePlan(results: HedisResult[], plan: SimulationPlan) {
 }
 
 // Cheap deterministic hash so the synthetic trend is stable across renders.
-function hash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return (h >>> 0) / 4294967296;
-}
+const hash = hash01;
 
 /**
  * Synthetic 12-month rate trajectory ending at the measure's current rate.

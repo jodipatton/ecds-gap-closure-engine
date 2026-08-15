@@ -1,15 +1,15 @@
-// Repository layer. Picks one of two backends at module init:
+// Repository layer. One narrow RawStore seam (read/write a whole value by
+// key) with three interchangeable backends, picked at module init:
 //
-//   - **Vercel KV** (when KV_REST_API_URL is in the environment, set
-//     automatically when you provision Vercel KV / Upstash Redis in the
-//     Vercel dashboard). Each collection is stored as one JSON-array value
-//     under a single key. Works inside Vercel's read-only serverless runtime.
+//   - **Firestore** (when FIREBASE_SERVICE_ACCOUNT is set): each collection is
+//     one document whose `data` field holds the whole array.
+//   - **Vercel KV** (when KV_REST_API_URL is set): each collection is one
+//     JSON-array value under a single key.
+//   - **JSON file** fallback (default for local dev): one file per collection
+//     under data/store/.
 //
-//   - **JSON file** fallback (default for local dev). Same on-disk layout
-//     as before: one file per collection under data/store/.
-//
-// The same `CollectionRepo<T>` interface is exposed either way so the engine,
-// seed, UI, and agent tools never need to know which backend is active.
+// Every repo operation is written once against RawStore, so the engine, seed,
+// UI, and agent tools never need to know which backend is active.
 
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -17,7 +17,6 @@ import type {
   AuditEvent,
   Campaign,
   Claim,
-  FeedbackEntry,
   Condition,
   DocumentReference,
   EhrConnection,
@@ -51,101 +50,64 @@ export interface CollectionRepo<T> {
   clear(): Promise<void>;
 }
 
+/** The single backend seam: read/write one whole value per key. */
+interface RawStore {
+  read<T>(key: string, fallback: T): Promise<T>;
+  write(key: string, data: unknown): Promise<void>;
+}
+
 // ---- JSON file backend ----------------------------------------------------
 
 const STORE_DIR = path.join(process.cwd(), 'data', 'store');
 
-async function ensureStore() {
-  await fs.mkdir(STORE_DIR, { recursive: true });
-}
-
-async function readJsonFile<T>(file: string, fallback: T): Promise<T> {
-  await ensureStore();
-  const p = path.join(STORE_DIR, file);
-  try {
-    const buf = await fs.readFile(p, 'utf-8');
-    return JSON.parse(buf) as T;
-  } catch (err: any) {
-    if (err?.code === 'ENOENT') return fallback;
-    throw err;
+const jsonStore: RawStore = {
+  async read<T>(key: string, fallback: T): Promise<T> {
+    const p = path.join(STORE_DIR, `${key}.json`);
+    try {
+      const buf = await fs.readFile(p, 'utf-8');
+      return JSON.parse(buf) as T;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return fallback;
+      throw err;
+    }
+  },
+  async write(key: string, data: unknown): Promise<void> {
+    await fs.mkdir(STORE_DIR, { recursive: true });
+    const p = path.join(STORE_DIR, `${key}.json`);
+    const tmp = `${p}.tmp`;
+    await fs.writeFile(tmp, JSON.stringify(data, null, 2), 'utf-8');
+    await fs.rename(tmp, p);
   }
-}
-
-async function writeJsonFile(file: string, data: unknown): Promise<void> {
-  await ensureStore();
-  const p = path.join(STORE_DIR, file);
-  const tmp = `${p}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(data, null, 2), 'utf-8');
-  await fs.rename(tmp, p);
-}
-
-function makeJsonRepo<T>(collection: string): CollectionRepo<T> {
-  const file = `${collection}.json`;
-  return {
-    list: () => readJsonFile<T[]>(file, []),
-    put: (items) => writeJsonFile(file, items),
-    async upsertOne(item, key) {
-      const items = await readJsonFile<T[]>(file, []);
-      const idx = items.findIndex((x) => (x as any)[key] === (item as any)[key]);
-      if (idx >= 0) items[idx] = item;
-      else items.push(item);
-      await writeJsonFile(file, items);
-    },
-    clear: () => writeJsonFile(file, [])
-  };
-}
+};
 
 // ---- Vercel KV backend ----------------------------------------------------
 
 // Lazy-import so the JSON path works in environments where @vercel/kv isn't
 // installed (e.g. ad-hoc node scripts without npm install).
-let _kv: any = null;
+let _kv: (typeof import('@vercel/kv'))['kv'] | null = null;
 async function kvClient() {
-  if (_kv) return _kv;
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const mod = await import('@vercel/kv');
-  _kv = mod.kv;
+  if (!_kv) _kv = (await import('@vercel/kv')).kv;
   return _kv;
 }
 
-function kvKey(collection: string) {
-  return `ecds:${collection}`;
-}
-
-function makeKvRepo<T>(collection: string): CollectionRepo<T> {
-  const key = kvKey(collection);
-  return {
-    async list() {
-      const kv = await kvClient();
-      const val = (await kv.get(key)) as T[] | null;
-      return val ?? [];
-    },
-    async put(items) {
-      const kv = await kvClient();
-      await kv.set(key, items);
-    },
-    async upsertOne(item, k) {
-      const kv = await kvClient();
-      const items = ((await kv.get(key)) as T[] | null) ?? [];
-      const idx = items.findIndex((x: any) => x[k] === (item as any)[k]);
-      if (idx >= 0) items[idx] = item;
-      else items.push(item);
-      await kv.set(key, items);
-    },
-    async clear() {
-      const kv = await kvClient();
-      await kv.set(key, []);
-    }
-  };
-}
+const kvStore: RawStore = {
+  async read<T>(key: string, fallback: T): Promise<T> {
+    const kv = await kvClient();
+    const val = (await kv.get(`ecds:${key}`)) as T | null;
+    return val ?? fallback;
+  },
+  async write(key: string, data: unknown): Promise<void> {
+    const kv = await kvClient();
+    await kv.set(`ecds:${key}`, data);
+  }
+};
 
 // ---- Firestore backend ----------------------------------------------------
 
 // Mirrors the KV layout: each collection is one Firestore document whose
-// `data` field holds the whole array. This keeps list/put/upsertOne/clear
-// semantics identical to the other backends. (Firestore caps a document at
-// 1 MiB; the demo's largest collection — claims for ~120 members — is well
-// under that. Move to per-document storage if seeds grow much larger.)
+// `data` field holds the whole array. (Firestore caps a document at 1 MiB;
+// the demo's largest collection — claims for ~120 members — is well under
+// that. Move to per-document storage if seeds grow much larger.)
 
 const FS_COLLECTION = 'ecds_store';
 
@@ -153,14 +115,15 @@ const FS_COLLECTION = 'ecds_store';
 // fan out repo reads via Promise.all, so fsDb() is called concurrently; a
 // single shared promise guarantees settings() runs exactly once and strictly
 // before any read/write (calling it after the client is used throws).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _fsInit: Promise<any> | null = null;
-function fsDb(): Promise<any> {
+function fsDb() {
   if (_fsInit) return _fsInit;
   _fsInit = (async () => {
     // firebase-admin is CJS; normalize the dynamic-import interop shape.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mod: any = await import('firebase-admin');
-    const admin: any = mod.default ?? mod;
+    const admin = mod.default ?? mod;
     if (admin.apps.length === 0) {
       const raw = process.env.FIREBASE_SERVICE_ACCOUNT ?? '';
       const json = raw.trim().startsWith('{')
@@ -184,97 +147,69 @@ function fsDb(): Promise<any> {
   return _fsInit;
 }
 
-async function fsRead<T>(docId: string, fallback: T): Promise<T> {
-  const db = await fsDb();
-  const snap = await db.collection(FS_COLLECTION).doc(docId).get();
-  if (!snap.exists) return fallback;
-  const val = snap.data()?.data;
-  return (val ?? fallback) as T;
-}
+const firestoreStore: RawStore = {
+  async read<T>(key: string, fallback: T): Promise<T> {
+    const db = await fsDb();
+    const snap = await db.collection(FS_COLLECTION).doc(key).get();
+    if (!snap.exists) return fallback;
+    const val = snap.data()?.data;
+    return (val ?? fallback) as T;
+  },
+  async write(key: string, data: unknown): Promise<void> {
+    const db = await fsDb();
+    await db.collection(FS_COLLECTION).doc(key).set({ data, updatedAt: Date.now() });
+  }
+};
 
-async function fsWrite(docId: string, data: unknown): Promise<void> {
-  const db = await fsDb();
-  await db.collection(FS_COLLECTION).doc(docId).set({ data, updatedAt: Date.now() });
-}
+// ---- Repo factory (written once, against RawStore) ------------------------
 
-function makeFirestoreRepo<T>(collection: string): CollectionRepo<T> {
+const store: RawStore =
+  BACKEND === 'firestore' ? firestoreStore : BACKEND === 'kv' ? kvStore : jsonStore;
+
+function makeRepo<T>(collection: string): CollectionRepo<T> {
   return {
-    list: () => fsRead<T[]>(collection, []),
-    put: (items) => fsWrite(collection, items),
+    list: () => store.read<T[]>(collection, []),
+    put: (items) => store.write(collection, items),
     async upsertOne(item, key) {
-      const items = await fsRead<T[]>(collection, []);
-      const idx = items.findIndex((x) => (x as any)[key] === (item as any)[key]);
+      const items = await store.read<T[]>(collection, []);
+      const idx = items.findIndex((x) => x[key] === item[key]);
       if (idx >= 0) items[idx] = item;
       else items.push(item);
-      await fsWrite(collection, items);
+      await store.write(collection, items);
     },
-    clear: () => fsWrite(collection, [])
+    clear: () => store.write(collection, [])
   };
 }
 
 // ---- Public registry ------------------------------------------------------
 
-const make =
-  BACKEND === 'firestore'
-    ? makeFirestoreRepo
-    : BACKEND === 'kv'
-      ? makeKvRepo
-      : makeJsonRepo;
-
 export const repos = {
-  members: make<Member>('members'),
-  claims: make<Claim>('claims'),
-  attribution: make<MemberAttribution>('memberAttribution'),
-  providers: make<ProviderOrg>('providerDirectory'),
-  observations: make<Observation>('observations'),
-  conditions: make<Condition>('conditions'),
-  medications: make<MedicationRequest>('medications'),
-  documents: make<DocumentReference>('documents'),
-  hedisResults: make<HedisResult>('hedisResults'),
-  gaps: make<MeasureGap>('gaps'),
-  engagement: make<EngagementQueueEntry>('engagementQueue'),
-  ehrConnections: make<EhrConnection>('ehrConnections'),
-  campaigns: make<Campaign>('campaigns'),
-  payerAccess: make<PayerAccessGrant>('payerAccess'),
-  auditEvents: make<AuditEvent>('auditEvents'),
-  contracts: make<ValueContract>('valueContracts'),
-  feedback: make<FeedbackEntry>('feedback')
+  members: makeRepo<Member>('members'),
+  claims: makeRepo<Claim>('claims'),
+  attribution: makeRepo<MemberAttribution>('memberAttribution'),
+  providers: makeRepo<ProviderOrg>('providerDirectory'),
+  observations: makeRepo<Observation>('observations'),
+  conditions: makeRepo<Condition>('conditions'),
+  medications: makeRepo<MedicationRequest>('medications'),
+  documents: makeRepo<DocumentReference>('documents'),
+  hedisResults: makeRepo<HedisResult>('hedisResults'),
+  gaps: makeRepo<MeasureGap>('gaps'),
+  engagement: makeRepo<EngagementQueueEntry>('engagementQueue'),
+  ehrConnections: makeRepo<EhrConnection>('ehrConnections'),
+  campaigns: makeRepo<Campaign>('campaigns'),
+  payerAccess: makeRepo<PayerAccessGrant>('payerAccess'),
+  auditEvents: makeRepo<AuditEvent>('auditEvents'),
+  contracts: makeRepo<ValueContract>('valueContracts')
 };
 
 // ---- Seed summary (single object, not a collection) -----------------------
 
-const SEED_SUMMARY_FILE = 'seedSummary.json';
-const SEED_SUMMARY_KV_KEY = 'ecds:seedSummary';
-
-const SEED_SUMMARY_FS_DOC = 'seedSummary';
-
-export async function readSeedSummary(): Promise<SeedSummary | null> {
-  if (BACKEND === 'firestore') {
-    return fsRead<SeedSummary | null>(SEED_SUMMARY_FS_DOC, null);
-  }
-  if (BACKEND === 'kv') {
-    const kv = await kvClient();
-    const val = (await kv.get(SEED_SUMMARY_KV_KEY)) as SeedSummary | null;
-    return val ?? null;
-  }
-  return readJsonFile<SeedSummary | null>(SEED_SUMMARY_FILE, null);
+export function readSeedSummary(): Promise<SeedSummary | null> {
+  return store.read<SeedSummary | null>('seedSummary', null);
 }
 
-export async function writeSeedSummary(s: SeedSummary): Promise<void> {
-  if (BACKEND === 'firestore') {
-    await fsWrite(SEED_SUMMARY_FS_DOC, s);
-    return;
-  }
-  if (BACKEND === 'kv') {
-    const kv = await kvClient();
-    await kv.set(SEED_SUMMARY_KV_KEY, s);
-    return;
-  }
-  await writeJsonFile(SEED_SUMMARY_FILE, s);
-}
-
-export async function isSeeded(): Promise<boolean> {
-  return (await readSeedSummary()) !== null;
+export function writeSeedSummary(s: SeedSummary): Promise<void> {
+  return store.write('seedSummary', s);
 }
 
 export function activeBackend(): Backend {

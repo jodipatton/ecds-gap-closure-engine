@@ -52,7 +52,7 @@ export function ConnectionWizard(props: WizardProps) {
   const [validateResult, setValidateResult] = useState<any>(null);
   const [testResult, setTestResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [completing, setCompleting] = useState(false);
+  const [, setCompleting] = useState(false);
 
   function update(name: string, value: string) {
     setValues((v) => ({ ...v, [name]: value }));
@@ -167,7 +167,6 @@ export function ConnectionWizard(props: WizardProps) {
                     </a>
                   )}
                   <StepActions
-                    idx={idx}
                     state={state}
                     onComplete={
                       idx === 0 ? markStep1Done :
@@ -222,7 +221,7 @@ export function ConnectionWizard(props: WizardProps) {
           <p className="mt-1 text-sm text-emerald-700">
             Heading to the connection status dashboard…
           </p>
-          <a href={`/provider/connect/status?npi=${props.providerNpi}`} className="mt-3 inline-flex rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white">
+          <a href={`/provider/connect?npi=${props.providerNpi}`} className="mt-3 inline-flex rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white">
             View connection status
           </a>
         </div>
@@ -244,8 +243,7 @@ function StepNumber({ n, state }: { n: number; state: 'pending' | 'running' | 'd
   );
 }
 
-function StepActions({ idx, state, onComplete, canRun, label }: {
-  idx: number;
+function StepActions({ state, onComplete, canRun, label }: {
   state: 'pending' | 'running' | 'done' | 'error';
   onComplete: () => void;
   canRun: boolean;

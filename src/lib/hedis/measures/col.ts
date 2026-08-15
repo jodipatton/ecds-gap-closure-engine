@@ -4,6 +4,7 @@
 
 import type { MeasureSpec } from '@/lib/data/types';
 import { ageOn, claimsWithProc, continuouslyEnrolledFor, myEnd, myStart } from '../util';
+import { CODES } from '../valuesets';
 
 export const col: MeasureSpec = {
   id: 'COL',
@@ -21,11 +22,11 @@ export const col: MeasureSpec = {
   satisfiedByClaims(ctx) {
     const yr = ctx.measurementYear;
     const lookbacks: Array<[string[], string, string]> = [
-      [['82270', '82274'], myStart(yr), myEnd(yr)],
-      [['81528'], `${yr - 2}-01-01`, myEnd(yr)],
-      [['45330', '45331', '45332', '45333', '45334', '45335'], `${yr - 4}-01-01`, myEnd(yr)],
-      [['45378', '45380', '45385', '45388', '45398'], `${yr - 9}-01-01`, myEnd(yr)],
-      [['74263'], `${yr - 4}-01-01`, myEnd(yr)]
+      [CODES.fobt_fit_cpt, myStart(yr), myEnd(yr)],
+      [CODES.fit_dna_cpt, `${yr - 2}-01-01`, myEnd(yr)],
+      [CODES.flex_sig_cpt, `${yr - 4}-01-01`, myEnd(yr)],
+      [CODES.colonoscopy_cpt, `${yr - 9}-01-01`, myEnd(yr)],
+      [CODES.ct_colonography_cpt, `${yr - 4}-01-01`, myEnd(yr)]
     ];
     const evidence: string[] = [];
     let ok = false;
@@ -43,10 +44,10 @@ export const col: MeasureSpec = {
     // clinical-data confirmation in the absence of a billed CPT.
     const yr = ctx.measurementYear;
     const doc = ctx.documents.find(
-      (d) => d.loincType === '34117-2' && d.date >= `${yr - 9}-01-01` && d.date <= myEnd(yr)
+      (d) => d.loincType === CODES.colonoscopy_report_loinc && d.date >= `${yr - 9}-01-01` && d.date <= myEnd(yr)
     );
     return doc
       ? { ok: true, evidence: [`DocumentReference LOINC 34117-2 dated ${doc.date}`] }
-      : { ok: false, evidence: [], missingDataElement: 'Colonoscopy DocumentReference (LOINC 34117-2)' };
+      : { ok: false, evidence: [], missing: { kind: 'document', description: 'Colonoscopy DocumentReference (LOINC 34117-2)' } };
   }
 };

@@ -4,8 +4,9 @@
 
 import type { MeasureSpec } from '@/lib/data/types';
 import { ageOn, hasObservation, myEnd, myStart } from '../util';
+import { CODES } from '../valuesets';
 
-const PHQ_LOINCS = ['44249-1', '44261-6', '55758-7'];
+const PHQ_LOINCS = CODES.phq_screening_loinc;
 
 export const dsfe: MeasureSpec = {
   id: 'DSF-E',
@@ -26,6 +27,6 @@ export const dsfe: MeasureSpec = {
     const ok = hasObservation(ctx, PHQ_LOINCS, myStart(ctx.measurementYear), myEnd(ctx.measurementYear));
     return ok
       ? { ok: true, evidence: ['PHQ-9/PHQ-2 Observation present in MY'] }
-      : { ok: false, evidence: [], missingDataElement: 'FHIR Observation PHQ-9/PHQ-2 (LOINC 44249-1 / 44261-6) in measurement year' };
+      : { ok: false, evidence: [], missing: { kind: 'observation', description: 'FHIR Observation PHQ-9/PHQ-2 (LOINC 44249-1 / 44261-6) in measurement year' } };
   }
 };

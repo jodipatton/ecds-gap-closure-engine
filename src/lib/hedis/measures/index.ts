@@ -28,6 +28,9 @@ export const MEASURES: MeasureSpec[] = [
   pnde
 ];
 
+/** Canonical measure-ID list — derive from this, never hardcode. */
+export const MEASURE_IDS = MEASURES.map((m) => m.id);
+
 export function getMeasure(id: string): MeasureSpec | undefined {
   return MEASURES.find((m) => m.id === id);
 }

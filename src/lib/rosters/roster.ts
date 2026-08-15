@@ -5,9 +5,8 @@
 //  - provider: scoped to one NPI's attributed panel, framed as a worklist
 //              (what to do for this patient) without plan economics.
 
-import { repos, readSeedSummary } from '@/lib/data/repository';
+import { getSnapshot } from '@/lib/data/snapshot';
 import { computeMemberRisk } from '@/lib/risk/raf';
-import type { Claim, Condition } from '@/lib/data/types';
 
 export type RosterAudience = 'payer' | 'provider';
 
@@ -34,39 +33,15 @@ export interface RosterResult {
   rows: RosterRow[];
 }
 
-function indexList<T>(arr: T[], key: (t: T) => string): Map<string, T[]> {
-  const m = new Map<string, T[]>();
-  for (const x of arr) {
-    const k = key(x);
-    const l = m.get(k) ?? [];
-    l.push(x);
-    m.set(k, l);
-  }
-  return m;
-}
-
 export async function buildRoster(
   audience: RosterAudience,
   providerNpi?: string
 ): Promise<RosterResult> {
-  const [members, attribution, gaps, conditions, claims, providers, summary] = await Promise.all([
-    repos.members.list(),
-    repos.attribution.list(),
-    repos.gaps.list(),
-    repos.conditions.list(),
-    repos.claims.list(),
-    repos.providers.list(),
-    readSeedSummary()
-  ]);
-  const my = summary?.measurementYear ?? new Date().getFullYear();
-
-  const attrByMember = new Map(attribution.map((a) => [a.memberId, a]));
-  const condByMember = indexList<Condition>(conditions, (c) => c.memberId);
-  const claimByMember = indexList<Claim>(claims, (c) => c.memberId);
-  const providerByNpi = new Map(providers.map((p) => [p.npi, p]));
+  const snap = await getSnapshot();
+  const { members, measurementYear: my, attributionByMember: attrByMember, providerByNpi } = snap;
 
   const openByMember = new Map<string, string[]>();
-  for (const g of gaps) {
+  for (const g of snap.gaps) {
     if (!g.status.startsWith('open-')) continue;
     const l = openByMember.get(g.memberId) ?? [];
     l.push(g.measureId);
@@ -84,8 +59,8 @@ export async function buildRoster(
     const openMeasures = openByMember.get(m.id) ?? [];
     const risk = computeMemberRisk(
       m,
-      condByMember.get(m.id) ?? [],
-      claimByMember.get(m.id) ?? [],
+      snap.conditionsByMember.get(m.id) ?? [],
+      snap.claimsByMember.get(m.id) ?? [],
       my
     );
     // Only include members that are actionable.

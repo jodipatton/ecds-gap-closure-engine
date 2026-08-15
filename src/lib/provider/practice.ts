@@ -4,6 +4,7 @@
 // portal can answer "for the members seeing Dr. X, here are the gaps."
 
 import { repos } from '@/lib/data/repository';
+import { fnv1a as hash } from '@/lib/shared/hash';
 import type { ProviderOrg } from '@/lib/data/types';
 
 export interface Clinician {
@@ -14,15 +15,6 @@ export interface Clinician {
 
 const FIRST = ['Dr. Aisha', 'Dr. Marcus', 'Dr. Lena', 'Dr. Raj', 'Dr. Sofia', 'Dr. Daniel'];
 const LAST = ['Okafor', 'Bennett', 'Petrova', 'Nair', 'Alvarez', 'Cohen'];
-
-function hash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
 
 // The mocked practice = the largest-panel organization in the directory.
 export async function getPractice(): Promise<ProviderOrg | null> {

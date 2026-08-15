@@ -6,7 +6,8 @@
   color-scheme: light;
 }
 
-html, body {
-  background: #F7F9FC;
-  color: #0A1733;
+html,
+body {
+  background: theme('colors.paper');
+  color: theme('colors.ink');
 }

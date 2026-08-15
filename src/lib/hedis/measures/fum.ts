@@ -7,8 +7,9 @@
 
 import type { MeasureSpec } from '@/lib/data/types';
 import { ageOn, myEnd } from '../util';
+import { CODES } from '../valuesets';
 
-const MH_DX = ['F20', 'F21', 'F22', 'F23', 'F25', 'F30', 'F31', 'F32', 'F33', 'F34', 'F40', 'F41', 'F42', 'F43', 'F44', 'F45', 'F60'];
+const MH_DX = CODES.mental_illness_dx_prefixes;
 
 function startsWithAny(s: string, prefixes: string[]) {
   return prefixes.some((p) => s.startsWith(p));
@@ -34,7 +35,7 @@ export const fum: MeasureSpec = {
     if (age < 6) return false;
     return ctx.claims.some(
       (c) =>
-        c.placeOfService === '23' &&
+        c.placeOfService === CODES.ed_visit_pos &&
         c.serviceDate.startsWith(String(ctx.measurementYear)) &&
         c.diagnosisCodes.some((d) => startsWithAny(d, MH_DX))
     );
@@ -42,7 +43,7 @@ export const fum: MeasureSpec = {
   isExcluded() { return false; },
   satisfiedByClaims(ctx) {
     const edVisits = ctx.claims.filter(
-      (c) => c.placeOfService === '23' && c.diagnosisCodes.some((d) => startsWithAny(d, MH_DX))
+      (c) => c.placeOfService === CODES.ed_visit_pos && c.diagnosisCodes.some((d) => startsWithAny(d, MH_DX))
     );
     for (const ed of edVisits) {
       const window = addDays(ed.serviceDate, 30);
@@ -51,7 +52,7 @@ export const fum: MeasureSpec = {
           c.serviceDate > ed.serviceDate &&
           c.serviceDate <= window &&
           c.diagnosisCodes.some((d) => startsWithAny(d, MH_DX)) &&
-          c.procedureCodes.some((p) => ['90832', '90834', '90837', '99213', '99214'].includes(p))
+          c.procedureCodes.some((p) => CODES.followup_visit_cpt.includes(p))
       );
       if (followup) {
         return { ok: true, evidence: [`ED ${ed.serviceDate} → follow-up ${followup.serviceDate}`] };
@@ -63,10 +64,10 @@ export const fum: MeasureSpec = {
     // Discharge summary CCDA confirms a follow-up encounter type when claims
     // are ambiguous. Illustrative.
     const ok = ctx.documents.some(
-      (d) => d.loincType === '18842-5' && d.date.startsWith(String(ctx.measurementYear))
+      (d) => d.loincType === CODES.discharge_summary_loinc && d.date.startsWith(String(ctx.measurementYear))
     );
     return ok
       ? { ok: true, evidence: ['Discharge summary DocumentReference (LOINC 18842-5) in MY'] }
-      : { ok: false, evidence: [], missingDataElement: 'CCDA Discharge Summary (LOINC 18842-5) for ED encounter' };
+      : { ok: false, evidence: [], missing: { kind: 'document', description: 'CCDA Discharge Summary (LOINC 18842-5) for ED encounter' } };
   }
 };

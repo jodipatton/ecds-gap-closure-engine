@@ -6,6 +6,7 @@
 
 import type { MeasureSpec } from '@/lib/data/types';
 import { ageOn, myEnd } from '../util';
+import { CODES } from '../valuesets';
 
 function diffDays(a: string, b: string): number {
   const [ay, am, ad] = a.split('-').map(Number);
@@ -15,8 +16,8 @@ function diffDays(a: string, b: string): number {
   return Math.round((db - da) / (1000 * 60 * 60 * 24));
 }
 
-const DELIVERY_CPT = new Set(['59400', '59409', '59410', '59510', '59514', '59515']);
-const POSTPARTUM_CPT = new Set(['0503F', '99213', '99214', '57170']);
+const DELIVERY_CPT = new Set(CODES.delivery_cpt);
+const POSTPARTUM_CPT = new Set(CODES.postpartum_visit_cpt);
 
 export const pnde: MeasureSpec = {
   id: 'PND-E',
@@ -47,10 +48,10 @@ export const pnde: MeasureSpec = {
   satisfiedByClinical(ctx) {
     // CCDA postpartum care plan note (LOINC 57133-1) confirms visit content.
     const ok = ctx.documents.some(
-      (d) => d.loincType === '57133-1' && d.date.startsWith(String(ctx.measurementYear))
+      (d) => d.loincType === CODES.postpartum_note_loinc && d.date.startsWith(String(ctx.measurementYear))
     );
     return ok
       ? { ok: true, evidence: ['CCDA Postpartum care note (LOINC 57133-1)'] }
-      : { ok: false, evidence: [], missingDataElement: 'CCDA Postpartum care note (LOINC 57133-1)' };
+      : { ok: false, evidence: [], missing: { kind: 'document', description: 'CCDA Postpartum care note (LOINC 57133-1)' } };
   }
 };

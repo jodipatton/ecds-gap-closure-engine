@@ -5,19 +5,9 @@
 
 import type { MeasureSpec } from '@/lib/data/types';
 import { ageOn, myEnd } from '../util';
+import { CODES } from '../valuesets';
 
-const ANTIGENS: Record<string, string[]> = {
-  DTaP: ['20'],
-  IPV: ['10'],
-  MMR: ['03'],
-  HiB: ['48', '49', '50', '51'],
-  HepB: ['08'],
-  VZV: ['21'],
-  PCV: ['133'],
-  HepA: ['83'],
-  Rotavirus: ['116', '119'],
-  Influenza: ['88', '141', '150', '155']
-};
+const ANTIGENS = CODES.cvx;
 
 export const cis: MeasureSpec = {
   id: 'CIS',
@@ -43,6 +33,6 @@ export const cis: MeasureSpec = {
     return { ok: missing === 0, evidence };
   },
   satisfiedByClinical() {
-    return { ok: false, evidence: [], missingDataElement: 'Immunization records (CVX) for missing antigens' };
+    return { ok: false, evidence: [], missing: { kind: 'immunization', description: 'Immunization records (CVX) for missing antigens' } };
   }
 };

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { Button } from '@/components/ui';
 import { useRouter } from 'next/navigation';
 
 export function ResyncButton({ npi }: { npi: string }) {
@@ -28,13 +29,9 @@ export function ResyncButton({ npi }: { npi: string }) {
   return (
     <div className="flex items-center gap-3">
       {msg && <span className="text-xs text-slate-600">{msg}</span>}
-      <button
-        onClick={resync}
-        disabled={pending}
-        className="rounded bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
+      <Button onClick={resync} disabled={pending}>
         {pending ? 'Syncing…' : 'Re-sync now'}
-      </button>
+      </Button>
     </div>
   );
 }
