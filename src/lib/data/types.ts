@@ -249,6 +249,16 @@ export interface EhrConnection {
   setupCompletedBy: string | null;
   // Diagnostic detail rendered in the status dashboard
   lastErrorMessage?: string | null;
+  // Summary of the most recent clinical-data pull (drives the sync-result
+  // panel and the payer dashboard's "since last sync" chips).
+  lastSyncSummary?: {
+    at: ISODate;
+    recordsSynced: number;
+    gapsClosed: number;
+    dollarsUnlocked: number;
+    byMeasure: Array<{ measureId: string; closed: number }>;
+    rateShift: Array<{ measureId: string; before: number; after: number }>;
+  } | null;
 }
 
 // ---- Outreach campaigns ---------------------------------------------------

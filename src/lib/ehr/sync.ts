@@ -11,6 +11,7 @@
 import { repos, readSeedSummary } from '@/lib/data/repository';
 import { runEngine } from '@/lib/hedis/engine';
 import { recordAudit, psvFor } from '@/lib/audit/audit';
+import { gapValue } from '@/lib/analytics/projection';
 import type {
   Condition,
   DocumentReference,
@@ -132,7 +133,10 @@ export interface SyncResult {
   openGapsBefore: number;
   openGapsAfter: number;
   gapsClosed: number;
+  dollarsUnlocked: number;
   byMeasure: Array<{ measureId: string; closed: number }>;
+  /** Plan-wide rate movement per touched measure (drives the dumbbells). */
+  rateShift: Array<{ measureId: string; before: number; after: number }>;
 }
 
 function countOpen(gaps: MeasureGap[], memberIds: Set<string>): number {
@@ -140,12 +144,13 @@ function countOpen(gaps: MeasureGap[], memberIds: Set<string>): number {
 }
 
 export async function syncProviderClinicalData(npi: string): Promise<SyncResult> {
-  const [providers, attribution, gaps, connections, summary] = await Promise.all([
+  const [providers, attribution, gaps, connections, summary, resultsBefore] = await Promise.all([
     repos.providers.list(),
     repos.attribution.list(),
     repos.gaps.list(),
     repos.ehrConnections.list(),
-    readSeedSummary()
+    readSeedSummary(),
+    repos.hedisResults.list()
   ]);
 
   const provider = providers.find((p) => p.npi === npi);
@@ -194,25 +199,8 @@ export async function syncProviderClinicalData(npi: string): Promise<SyncResult>
     ]);
   }
 
-  // Mark the connection active + record the sync.
   const now = new Date().toISOString();
   const existing = connections.find((c) => c.providerNpi === npi);
-  if (existing) {
-    await repos.ehrConnections.upsertOne(
-      {
-        ...existing,
-        lastTokenRefresh: now,
-        lastSuccessfulSync: now,
-        totalRecordsSynced: existing.totalRecordsSynced + recordsSynced,
-        connectionStatus: 'active',
-        supportedResources: existing.supportedResources.length
-          ? existing.supportedResources
-          : ECDS_RESOURCES,
-        lastErrorMessage: null
-      },
-      'providerNpi'
-    );
-  }
 
   // Provenance / PSV audit entry for the acquisition.
   const psv = psvFor(provider);
@@ -235,10 +223,49 @@ export async function syncProviderClinicalData(npi: string): Promise<SyncResult>
   });
 
   // Re-run the engine so gap/rate impact is real.
-  await runEngine({ measurementYear: my });
+  const engineRun = await runEngine({ measurementYear: my });
 
   const gapsAfter = await repos.gaps.list();
   const openGapsAfter = countOpen(gapsAfter, attributedMemberIds);
+  const gapsClosed = Math.max(0, openGapsBefore - openGapsAfter);
+
+  const byMeasure = [...byMeasureMap.entries()]
+    .map(([measureId, closed]) => ({ measureId, closed }))
+    .sort((a, b) => b.closed - a.closed);
+
+  const beforeById = new Map(resultsBefore.map((r) => [r.measureId, r]));
+  const rateShift = engineRun.results
+    .filter((r) => byMeasureMap.has(r.measureId))
+    .map((r) => ({
+      measureId: r.measureId,
+      before: beforeById.get(r.measureId)?.rate ?? r.rate,
+      after: r.rate
+    }));
+
+  const dollarsUnlocked = byMeasure.reduce((s, m) => {
+    const tier = beforeById.get(m.measureId)?.dataTier ?? 'uscdi-v3';
+    return s + m.closed * gapValue(tier);
+  }, 0);
+
+  // Mark the connection active and persist the sync summary (drives the
+  // provider sync panel and the payer dashboard's "since last sync" chips).
+  if (existing) {
+    await repos.ehrConnections.upsertOne(
+      {
+        ...existing,
+        lastTokenRefresh: now,
+        lastSuccessfulSync: now,
+        totalRecordsSynced: existing.totalRecordsSynced + recordsSynced,
+        connectionStatus: 'active',
+        supportedResources: existing.supportedResources.length
+          ? existing.supportedResources
+          : ECDS_RESOURCES,
+        lastErrorMessage: null,
+        lastSyncSummary: { at: now, recordsSynced, gapsClosed, dollarsUnlocked, byMeasure, rateShift }
+      },
+      'providerNpi'
+    );
+  }
 
   return {
     ok: true,
@@ -247,9 +274,9 @@ export async function syncProviderClinicalData(npi: string): Promise<SyncResult>
     recordsSynced,
     openGapsBefore,
     openGapsAfter,
-    gapsClosed: Math.max(0, openGapsBefore - openGapsAfter),
-    byMeasure: [...byMeasureMap.entries()]
-      .map(([measureId, closed]) => ({ measureId, closed }))
-      .sort((a, b) => b.closed - a.closed)
+    gapsClosed,
+    dollarsUnlocked,
+    byMeasure,
+    rateShift
   };
 }

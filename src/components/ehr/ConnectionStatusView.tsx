@@ -50,7 +50,7 @@ export function ConnectionStatusView({
           practice surfaces for its attributed members, then re-runs the ECDS engine and reports the
           gaps closed.
         </p>
-        <ClinicalSyncButton npi={provider.npi} />
+        <ClinicalSyncButton npi={provider.npi} lastSummary={connection.lastSyncSummary ?? null} />
       </Card>
 
       <Card>

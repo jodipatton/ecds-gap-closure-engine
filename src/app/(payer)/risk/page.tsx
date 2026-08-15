@@ -1,119 +1,151 @@
 import Link from 'next/link';
-import { repos, readSeedSummary } from '@/lib/data/repository';
-import { Card, Pill, StatTile } from '@/components/ui';
-import { planRiskSummary, RAF_DOLLARS } from '@/lib/risk/raf';
+import { HeartPulse } from 'lucide-react';
+import { getRisk, getSnapshot } from '@/lib/data/snapshot';
+import { Badge, ButtonLink, Card, CardHeader, DataTable, EmptyState, PageHeader, StatTile, type Column } from '@/components/ui';
+import { BarList } from '@/components/charts';
+import { RAF_DOLLARS, type MemberRisk } from '@/lib/risk/raf';
+import { money } from '@/lib/shared/format';
 
 export const dynamic = 'force-dynamic';
 
 export default async function RiskPage() {
-  const [members, conditions, claims, summary] = await Promise.all([
-    repos.members.list(),
-    repos.conditions.list(),
-    repos.claims.list(),
-    readSeedSummary()
-  ]);
-
-  if (members.length === 0) {
+  const snap = await getSnapshot();
+  if (snap.members.length === 0) {
     return (
-      <Card>
-        <p className="text-sm text-slate-600">
-          No members yet. Seed and run the engine from the{' '}
-          <Link href="/" className="text-accent hover:underline">dashboard</Link>.
-        </p>
-      </Card>
+      <EmptyState
+        title="No members yet"
+        description="Seed synthetic data and run analytics from the dashboard first."
+        action={<ButtonLink href="/">Go to dashboard</ButtonLink>}
+      />
     );
   }
 
-  const my = summary?.measurementYear ?? new Date().getFullYear();
-  const risk = planRiskSummary(members, conditions, claims, my);
+  const risk = await getRisk();
   const topGap = risk.members.filter((m) => m.suspectedHccs.length > 0).slice(0, 40);
+
+  // Recapture $ aggregated by suspected HCC.
+  const byHcc = new Map<string, { label: string; count: number; dollars: number }>();
+  for (const m of risk.members) {
+    for (const h of m.suspectedHccs) {
+      const cur = byHcc.get(h.hcc) ?? { label: h.label, count: 0, dollars: 0 };
+      cur.count++;
+      cur.dollars += Math.round(h.coef * RAF_DOLLARS);
+      byHcc.set(h.hcc, cur);
+    }
+  }
+  const hccRows = [...byHcc.entries()]
+    .map(([hcc, v]) => ({ hcc, ...v }))
+    .sort((a, b) => b.dollars - a.dollars)
+    .slice(0, 8);
+
+  const columns: Array<Column<MemberRisk>> = [
+    {
+      key: 'member',
+      header: 'Member',
+      render: (m) => (
+        <>
+          {m.memberName}
+          <div className="font-mono text-xs font-normal text-slate-400">{m.memberId}</div>
+        </>
+      )
+    },
+    {
+      key: 'demo',
+      header: 'Age/Sex',
+      className: 'text-xs',
+      render: (m) => (
+        <>
+          {m.age}/{m.sex} {m.medicareEligible && <Badge color="sky">MA</Badge>}
+        </>
+      )
+    },
+    { key: 'raf', header: 'Current RAF', align: 'right', render: (m) => m.currentRaf.toFixed(3) },
+    {
+      key: 'documented',
+      header: 'Documented HCCs',
+      className: 'text-xs',
+      render: (m) => (m.documentedHccs.length ? m.documentedHccs.map((h) => `${h.hcc} ${h.label}`).join('; ') : '—')
+    },
+    {
+      key: 'suspected',
+      header: 'Suspected HCCs (recapture)',
+      className: 'text-xs',
+      render: (m) => (
+        <ul className="space-y-0.5">
+          {m.suspectedHccs.map((h) => (
+            <li key={h.hcc}>
+              <Badge color="amber">{h.hcc}</Badge> <span className="text-slate-600">{h.label}</span>{' '}
+              <span className="text-slate-400">({h.evidenceIcd10})</span>
+            </li>
+          ))}
+        </ul>
+      )
+    },
+    {
+      key: 'opp',
+      header: '$ opportunity',
+      align: 'right',
+      render: (m) => <span className="font-medium text-good">{money(m.annualRevenueOpportunity)}</span>
+    },
+    {
+      key: 'ask',
+      header: '',
+      className: 'text-xs',
+      render: (m) => (
+        <Link href={`/chat?q=${encodeURIComponent(`What is the RAF detail for ${m.memberId}?`)}`} className="whitespace-nowrap text-accent hover:underline">
+          Ask assistant →
+        </Link>
+      )
+    }
+  ];
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-ink">Medicare risk adjustment (RAF / HCC)</h1>
-        <p className="mt-1 max-w-3xl text-sm text-slate-600">
-          Illustrative CMS-HCC model. RAF = demographic factor + additive HCC factors for documented
-          conditions. <strong>Suspected HCCs</strong> are conditions implied by claim diagnoses that
-          were never carried into a documented clinical Condition — the recapture opportunity. Not
-          licensed CMS-HCC software; ${RAF_DOLLARS.toLocaleString()} / 1.0 RAF assumed.
-        </p>
-      </div>
+      <PageHeader
+        icon={<HeartPulse size={24} strokeWidth={1.75} className="text-accent" aria-hidden />}
+        title="Risk adjustment (RAF / HCC)"
+        description={
+          <>
+            Illustrative CMS-HCC model. RAF = demographic factor + additive HCC factors for documented
+            conditions. <strong>Suspected HCCs</strong> are conditions implied by claim diagnoses that were
+            never carried into a documented clinical Condition — the recapture opportunity. Not licensed
+            CMS-HCC software; {money(RAF_DOLLARS)} / 1.0 RAF assumed.
+          </>
+        }
+        actions={<ButtonLink href="/rosters?audience=payer" size="sm">Generate roster →</ButtonLink>}
+      />
 
-      <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatTile label="Avg current RAF" value={risk.avgCurrentRaf.toFixed(3)} hint={`${risk.scoredMembers} scored`} />
         <StatTile label="Avg potential RAF" value={risk.avgPotentialRaf.toFixed(3)} hint="with recapture" />
         <StatTile label="Members w/ suspected gap" value={risk.membersWithSuspectedGap} hint={`${risk.medicareEligible} MA-eligible`} />
-        <StatTile
-          label="Revenue opportunity"
-          value={`$${risk.totalRevenueOpportunity.toLocaleString()}`}
-          hint="annual, illustrative"
-        />
+        <StatTile label="Revenue opportunity" value={money(risk.totalRevenueOpportunity)} hint="annual, illustrative" />
       </section>
 
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Recapture worklist — top suspected RAF gaps</h2>
-          <Link
-            href="/rosters?audience=payer"
-            className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-white"
-          >
-            Generate roster →
-          </Link>
-        </div>
+      {hccRows.length > 0 && (
         <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="py-2 pr-4">Member</th>
-                  <th className="py-2 pr-4">Age/Sex</th>
-                  <th className="py-2 pr-4">Current RAF</th>
-                  <th className="py-2 pr-4">Documented HCCs</th>
-                  <th className="py-2 pr-4">Suspected HCCs (recapture)</th>
-                  <th className="py-2">$ opportunity</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topGap.length === 0 && (
-                  <tr><td colSpan={6} className="py-6 text-slate-500">No suspected gaps — run the engine after seeding.</td></tr>
-                )}
-                {topGap.map((m) => (
-                  <tr key={m.memberId} className="border-b align-top last:border-0">
-                    <td className="py-2 pr-4">
-                      <div>{m.memberName}</div>
-                      <div className="text-xs text-slate-400">{m.memberId}</div>
-                    </td>
-                    <td className="py-2 pr-4 text-xs">
-                      {m.age}/{m.sex} {m.medicareEligible && <Pill color="sky">MA</Pill>}
-                    </td>
-                    <td className="py-2 pr-4 tabular-nums">{m.currentRaf.toFixed(3)}</td>
-                    <td className="py-2 pr-4 text-xs">
-                      {m.documentedHccs.length
-                        ? m.documentedHccs.map((h) => `${h.hcc} ${h.label}`).join('; ')
-                        : '—'}
-                    </td>
-                    <td className="py-2 pr-4 text-xs">
-                      <ul className="space-y-0.5">
-                        {m.suspectedHccs.map((h) => (
-                          <li key={h.hcc}>
-                            <Pill color="amber">{h.hcc}</Pill>{' '}
-                            <span className="text-slate-600">{h.label}</span>{' '}
-                            <span className="text-slate-400">({h.evidenceIcd10})</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </td>
-                    <td className="py-2 font-medium text-good">
-                      ${m.annualRevenueOpportunity.toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CardHeader title="Top suspected HCCs by recapture value" />
+          <BarList
+            format={money}
+            rows={hccRows.map((h, i) => ({
+              label: `${h.hcc} · ${h.label}`,
+              value: h.dollars,
+              emphasized: i === 0,
+              hint: `${h.count} member${h.count > 1 ? 's' : ''}`
+            }))}
+          />
         </Card>
-      </section>
+      )}
+
+      <Card>
+        <CardHeader title="Recapture worklist — top suspected RAF gaps" />
+        <DataTable
+          columns={columns}
+          rows={topGap}
+          rowKey={(m) => m.memberId}
+          empty={<EmptyState title="No suspected gaps" description="Run analytics after seeding." />}
+        />
+      </Card>
     </div>
   );
 }
