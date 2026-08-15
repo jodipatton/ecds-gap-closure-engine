@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getSnapshot } from '@/lib/data/snapshot';
-import { Card } from '@/components/ui';
+import { Card, DataTable, type Column } from '@/components/ui';
 import { campaignProgress } from '@/lib/outreach/campaigns';
 import { ContactControls } from '@/components/outreach/ContactControls';
+import type { CampaignMember } from '@/lib/data/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,41 +48,37 @@ export default async function CampaignPage({ params }: { params: { id: string } 
       </Card>
 
       <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-slate-500">
-                <th className="py-2 pr-4">Member</th>
-                <th className="py-2 pr-4">Measures</th>
-                <th className="py-2 pr-4">Suggested provider</th>
-                <th className="py-2">Outreach</th>
-              </tr>
-            </thead>
-            <tbody>
-              {c.members.slice(0, 100).map((m) => (
-                <tr key={m.memberId} className="border-b align-top last:border-0">
-                  <td className="py-2 pr-4">
-                    <div>{m.memberName}</div>
-                    <div className="font-mono text-xs text-slate-400">{m.memberId}</div>
-                  </td>
-                  <td className="py-2 pr-4 text-xs">{m.relatedMeasures.join(', ') || '—'}</td>
-                  <td className="py-2 pr-4 text-xs">{m.suggestedProviderName ?? '—'}</td>
-                  <td className="py-2">
-                    <ContactControls
-                      campaignId={c.id}
-                      memberId={m.memberId}
-                      status={m.contactStatus}
-                      measureId={m.relatedMeasures[0] ?? null}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {c.members.length > 100 && (
-            <p className="mt-2 text-xs text-slate-500">Showing first 100 of {c.members.length}.</p>
-          )}
-        </div>
+        <DataTable
+          columns={[
+            {
+              key: 'member',
+              header: 'Member',
+              render: (m) => (
+                <>
+                  {m.memberName}
+                  <div className="font-mono text-xs font-normal text-slate-400">{m.memberId}</div>
+                </>
+              )
+            },
+            { key: 'measures', header: 'Measures', className: 'text-xs', render: (m) => m.relatedMeasures.join(', ') || '—' },
+            { key: 'provider', header: 'Suggested provider', className: 'text-xs', render: (m) => m.suggestedProviderName ?? '—' },
+            {
+              key: 'outreach',
+              header: 'Outreach',
+              render: (m) => (
+                <ContactControls
+                  campaignId={c.id}
+                  memberId={m.memberId}
+                  status={m.contactStatus}
+                  measureId={m.relatedMeasures[0] ?? null}
+                />
+              )
+            }
+          ] satisfies Array<Column<CampaignMember>>}
+          rows={c.members}
+          rowKey={(m) => m.memberId}
+          limit={100}
+        />
       </Card>
     </div>
   );

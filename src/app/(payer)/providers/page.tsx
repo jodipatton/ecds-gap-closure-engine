@@ -1,111 +1,140 @@
 import Link from 'next/link';
-import { repos } from '@/lib/data/repository';
-import { Card, Pill } from '@/components/ui';
+import { Network } from 'lucide-react';
+import { getSnapshot } from '@/lib/data/snapshot';
+import { Badge, Card, CardHeader, DataTable, PageHeader, type Column } from '@/components/ui';
+import { BarList } from '@/components/charts';
 import { ehrPlatformGapImpact } from '@/lib/hedis/engine';
+import { gapValue } from '@/lib/analytics/projection';
+import { money } from '@/lib/shared/format';
+import type { ProviderOrg } from '@/lib/data/types';
 
 export const dynamic = 'force-dynamic';
 
 export default async function ProvidersPage() {
-  const [providers, attribution, gaps, ehrImpact] = await Promise.all([
-    repos.providers.list(),
-    repos.attribution.list(),
-    repos.gaps.list(),
-    ehrPlatformGapImpact()
-  ]);
+  const snap = await getSnapshot();
+  const ehrImpact = await ehrPlatformGapImpact(snap);
 
-  // Map per-org gap counts
   const gapsByMember: Record<string, number> = {};
-  for (const g of gaps) {
+  for (const g of snap.gaps) {
     if (!g.status.startsWith('open-')) continue;
     gapsByMember[g.memberId] = (gapsByMember[g.memberId] ?? 0) + 1;
   }
   const orgGaps: Record<string, number> = {};
-  for (const a of attribution) {
+  for (const a of snap.attribution) {
     if (!a.pcp) continue;
     orgGaps[a.pcp.npi] = (orgGaps[a.pcp.npi] ?? 0) + (gapsByMember[a.memberId] ?? 0);
   }
+  const connectedNpis = new Set(snap.ehrConnections.map((c) => c.providerNpi));
 
-  const sortedProviders = [...providers].sort((a, b) => (orgGaps[b.npi] ?? 0) - (orgGaps[a.npi] ?? 0));
+  const sorted = [...snap.providers].sort((a, b) => (orgGaps[b.npi] ?? 0) - (orgGaps[a.npi] ?? 0));
+  const heroPlatform = ehrImpact.find((r) => r.platform !== 'No PCP' && r.platform !== 'Unconnected');
+
+  const columns: Array<Column<ProviderOrg>> = [
+    {
+      key: 'org',
+      header: 'Organization',
+      render: (p) => (
+        <>
+          {p.organizationName}
+          <span className="ml-2 font-mono text-xs font-normal text-slate-400">NPI {p.npi}</span>
+        </>
+      )
+    },
+    { key: 'specialty', header: 'Specialty', className: 'text-xs', render: (p) => p.specialty },
+    {
+      key: 'ehr',
+      header: 'EHR',
+      className: 'text-xs',
+      render: (p) => p.ehrPlatform ?? <Badge color="rose">unvalidated</Badge>
+    },
+    {
+      key: 'connection',
+      header: 'Connection',
+      className: 'text-xs',
+      render: (p) =>
+        connectedNpis.has(p.npi) ? (
+          <Badge color="green">connected</Badge>
+        ) : p.fhirEndpointUrl ? (
+          <Badge color="amber">FHIR-ready · not connected</Badge>
+        ) : (
+          <Badge>no endpoint</Badge>
+        )
+    },
+    {
+      key: 'hie',
+      header: 'HIE',
+      className: 'text-xs',
+      render: (p) => (p.hieConnected ? <Badge color="sky">{p.hieNetwork ?? 'connected'}</Badge> : <Badge>—</Badge>)
+    },
+    { key: 'members', header: 'Members', align: 'right', render: (p) => p.memberCount },
+    {
+      key: 'gaps',
+      header: 'Open gaps',
+      align: 'right',
+      render: (p) => <span className="font-medium">{orgGaps[p.npi] ?? 0}</span>
+    },
+    {
+      key: 'yield',
+      header: 'Yield if connected',
+      align: 'right',
+      className: 'text-xs',
+      render: (p) => {
+        const n = orgGaps[p.npi] ?? 0;
+        return n > 0 && !connectedNpis.has(p.npi) ? money(n * gapValue('uscdi-v3')) : '—';
+      }
+    },
+    {
+      key: 'roster',
+      header: 'Roster',
+      className: 'text-xs',
+      render: (p) => (
+        <Link href={`/rosters?audience=provider&npi=${p.npi}`} className="text-accent hover:underline">
+          Generate →
+        </Link>
+      )
+    }
+  ];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Provider roster & EHR mapping</h1>
-        <p className="text-sm text-slate-600 mt-1 max-w-3xl">
-          Provider directory with EHR platform, FHIR endpoint, and HIE connectivity. Used by the engine
-          to route clinical-data acquisition to the right source. EHR sources are illustrative
-          (architected for CHPL, Lantern, and NPPES integration).
-        </p>
-      </div>
+      <PageHeader
+        icon={<Network size={24} strokeWidth={1.75} className="text-accent" aria-hidden />}
+        title="Providers & EHR connectivity"
+        description="The provider directory with EHR platform, FHIR endpoint, and HIE connectivity — how the engine routes clinical-data acquisition. EHR sources are illustrative (architected for CHPL / Lantern / NPPES)."
+        actions={
+          <Link href="/provider/connect" className="text-sm text-accent hover:underline">
+            Walk through connection as a provider →
+          </Link>
+        }
+      />
 
-      <section>
-        <h2 className="text-lg font-semibold mb-3">Open gap impact by EHR platform</h2>
-        <div className="grid gap-3 md:grid-cols-3">
-          {ehrImpact.map((row) => (
-            <Card key={row.platform}>
-              <div className="font-medium">{row.platform}</div>
-              <div className="mt-1 text-xs text-slate-500">{row.orgCount} orgs · {row.memberCount} members</div>
-              <div className="mt-3 text-2xl font-semibold">{row.openGaps}</div>
-              <div className="text-xs text-slate-500">{row.sharePct}% of plan-wide open gaps</div>
-            </Card>
-          ))}
-          {ehrImpact.length === 0 && <Card><p className="text-slate-500 text-sm">Run the engine to populate.</p></Card>}
-        </div>
-      </section>
-
-      <section>
-        <h2 className="text-lg font-semibold mb-3">Provider directory</h2>
+      {ehrImpact.length > 0 && (
         <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-slate-500 border-b">
-                  <th className="py-2 pr-4">Organization</th>
-                  <th className="py-2 pr-4">Specialty</th>
-                  <th className="py-2 pr-4">EHR</th>
-                  <th className="py-2 pr-4">Source</th>
-                  <th className="py-2 pr-4">FHIR endpoint</th>
-                  <th className="py-2 pr-4">HIE</th>
-                  <th className="py-2 pr-4">Members</th>
-                  <th className="py-2 pr-4">Open gaps</th>
-                  <th className="py-2">Roster</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedProviders.map((p) => (
-                  <tr key={p.npi} className="border-b last:border-0">
-                    <td className="py-2 pr-4">
-                      <div className="font-medium">{p.organizationName}</div>
-                      <div className="text-xs text-slate-400">NPI {p.npi}</div>
-                    </td>
-                    <td className="py-2 pr-4 text-xs">{p.specialty}</td>
-                    <td className="py-2 pr-4 text-xs">{p.ehrPlatform ?? <Pill color="rose">unvalidated</Pill>}</td>
-                    <td className="py-2 pr-4 text-xs uppercase">{p.ehrSource}</td>
-                    <td className="py-2 pr-4 text-xs">
-                      {p.fhirEndpointUrl
-                        ? <Pill color="green">FHIR ready</Pill>
-                        : <Pill color="amber">no endpoint</Pill>}
-                    </td>
-                    <td className="py-2 pr-4 text-xs">
-                      {p.hieConnected ? <Pill color="sky">{p.hieNetwork ?? 'connected'}</Pill> : <Pill>—</Pill>}
-                    </td>
-                    <td className="py-2 pr-4 text-sm">{p.memberCount}</td>
-                    <td className="py-2 pr-4 text-sm font-medium">{orgGaps[p.npi] ?? 0}</td>
-                    <td className="py-2 text-xs">
-                      <Link
-                        href={`/rosters?audience=provider&npi=${p.npi}`}
-                        className="text-accent hover:underline"
-                      >
-                        Generate →
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CardHeader
+            title="Open gaps by EHR platform"
+            action={
+              heroPlatform && (
+                <span className="text-xs text-slate-500">
+                  {heroPlatform.platform} alone covers {heroPlatform.sharePct}% of plan-wide open gaps
+                </span>
+              )
+            }
+          />
+          <BarList
+            rows={ehrImpact.map((r) => ({
+              label: r.platform,
+              value: r.openGaps,
+              emphasized: r.platform === heroPlatform?.platform,
+              hint: `${r.orgCount} orgs · ${r.memberCount} members`
+            }))}
+          />
         </Card>
-      </section>
+      )}
+
+      <Card>
+        <CardHeader title="Provider directory" />
+        <DataTable columns={columns} rows={sorted} rowKey={(p) => p.npi} />
+      </Card>
     </div>
   );
 }

@@ -23,6 +23,14 @@ export function denominator(r: HedisResult): number {
 }
 
 /**
+ * Illustrative plan-level target rate for a measure (70–85%), stable across
+ * renders. Contract-specific targets live on ValueContract.targetRatePct.
+ */
+export function measureTarget(measureId: string): number {
+  return 70 + Math.round(hash01(`target:${measureId}`) * 15);
+}
+
+/**
  * Recompute a measure's rate if `closeCount` open gaps were closed.
  * `closeCount` is clamped to [0, gapCount].
  */

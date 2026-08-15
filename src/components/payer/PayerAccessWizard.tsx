@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { Badge, Button, Card, CardHeader, Field, Input, Select, Stepper } from '@/components/ui';
 import type { PayerAccessGrant } from '@/lib/data/types';
 
 interface ProviderOpt {
@@ -58,36 +59,29 @@ export function PayerAccessWizard({
 
   return (
     <div className="space-y-5">
-      <Stepper step={step} />
+      <Stepper steps={[{ label: 'Identify' }, { label: 'Attest' }, { label: 'Connected' }]} current={grant?.status === 'connected' ? 3 : step - 1} />
 
-      <Card title="1 · Identify the practice">
+      <Card>
+        <CardHeader title="1 · Identify the practice" />
         <div className="flex flex-wrap gap-4">
           <Field label="Provider organization">
-            <select
-              value={npi}
-              onChange={(e) => setNpi(e.target.value)}
-              className="rounded border border-slate-300 px-2 py-1.5 text-sm"
-            >
+            <Select value={npi} onChange={(e) => setNpi(e.target.value)} className="w-auto">
               {providers.map((p) => (
                 <option key={p.npi} value={p.npi}>{p.organizationName}</option>
               ))}
-            </select>
+            </Select>
           </Field>
           <Field label="NPI">
-            <input value={npi} readOnly className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 font-mono text-sm" />
+            <Input value={npi} readOnly className="w-auto bg-slate-50 font-mono" />
           </Field>
           <Field label="Group TIN">
-            <input
-              value={tin}
-              onChange={(e) => setTin(e.target.value)}
-              placeholder="XX-XXXXXXX"
-              className="rounded border border-slate-300 px-2 py-1.5 text-sm"
-            />
+            <Input value={tin} onChange={(e) => setTin(e.target.value)} placeholder="XX-XXXXXXX" className="w-auto" />
           </Field>
         </div>
       </Card>
 
-      <Card title="2 · Attestations (CMS-0057-F)">
+      <Card>
+        <CardHeader title="2 · Attestations (CMS-0057-F)" />
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" checked={treat} onChange={(e) => setTreat(e.target.checked)} className="mt-0.5" />
           <span>
@@ -102,19 +96,20 @@ export function PayerAccessWizard({
             used only for treatment, care coordination, and quality.
           </span>
         </label>
-        <button
+        <Button
           onClick={() => call('register')}
           disabled={busy !== null || !treat || !minNec || !tin.trim()}
-          className="mt-4 rounded bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="mt-4"
         >
           {busy === 'register' ? 'Registering…' : 'Attest & register app'}
-        </button>
+        </Button>
       </Card>
 
-      <Card title="3 · Connection">
+      <Card>
+        <CardHeader title="3 · Connection" />
         {grant ? (
           <dl className="grid grid-cols-1 gap-y-1.5 text-sm md:grid-cols-2">
-            <Row k="Status" v={<StatusPill s={grant.status} />} />
+            <Row k="Status" v={<Badge color={grant.status === 'connected' ? 'green' : grant.status === 'attested' ? 'amber' : grant.status === 'error' ? 'rose' : 'slate'}>{grant.status}</Badge>} />
             <Row k="Client ID" v={<code className="font-mono text-xs">{grant.clientId}</code>} />
             <Row k="Payer FHIR base" v={<code className="font-mono text-xs">{grant.payerFhirBaseUrl}</code>} />
             <Row k="Token endpoint" v={<code className="font-mono text-xs">{grant.tokenEndpoint}</code>} />
@@ -124,13 +119,14 @@ export function PayerAccessWizard({
         ) : (
           <p className="text-sm text-slate-500">Complete attestation to register and reveal credentials.</p>
         )}
-        <button
+        <Button
+          variant="secondary"
           onClick={() => call('test')}
           disabled={busy !== null || !grant || grant.status === 'pending'}
-          className="mt-4 rounded border border-slate-300 px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="mt-4"
         >
           {busy === 'test' ? 'Connecting…' : 'Test connection & resolve attributed panel'}
-        </button>
+        </Button>
         {grant?.status === 'connected' && (
           <p className="mt-3 rounded bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
             Connected. The payer returned {grant.attributedMemberCount} attributed members this
@@ -147,44 +143,8 @@ export function PayerAccessWizard({
   );
 }
 
-function Stepper({ step }: { step: number }) {
-  const labels = ['Identify', 'Attest', 'Connected'];
-  return (
-    <div className="flex items-center gap-2 text-xs">
-      {labels.map((l, i) => (
-        <div key={l} className="flex items-center gap-2">
-          <span
-            className={`grid h-6 w-6 place-items-center rounded-full ${
-              i + 1 <= step ? 'bg-accent text-white' : 'bg-slate-200 text-slate-500'
-            }`}
-          >
-            {i + 1}
-          </span>
-          <span className={i + 1 <= step ? 'font-medium text-ink' : 'text-slate-500'}>{l}</span>
-          {i < labels.length - 1 && <span className="mx-1 text-slate-300">→</span>}
-        </div>
-      ))}
-    </div>
-  );
-}
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5">
-      <h3 className="mb-3 font-semibold text-ink">{title}</h3>
-      {children}
-    </div>
-  );
-}
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs uppercase tracking-wide text-slate-500">{label}</span>
-      {children}
-    </label>
-  );
-}
 
 function Row({ k, v }: { k: string; v: React.ReactNode }) {
   return (
@@ -195,12 +155,3 @@ function Row({ k, v }: { k: string; v: React.ReactNode }) {
   );
 }
 
-function StatusPill({ s }: { s: string }) {
-  const map: Record<string, string> = {
-    connected: 'bg-emerald-100 text-emerald-700',
-    attested: 'bg-amber-100 text-amber-700',
-    pending: 'bg-slate-100 text-slate-600',
-    error: 'bg-rose-100 text-rose-700'
-  };
-  return <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${map[s] ?? map.pending}`}>{s}</span>;
-}

@@ -1,7 +1,9 @@
 import Link from 'next/link';
-import { repos } from '@/lib/data/repository';
-import { Card, Pill } from '@/components/ui';
-import { buildRoster, type RosterAudience } from '@/lib/rosters/roster';
+import { ClipboardList, Download } from 'lucide-react';
+import { getSnapshot } from '@/lib/data/snapshot';
+import { Badge, ButtonLink, Card, CardHeader, DataTable, EmptyState, PageHeader, Select, type Column } from '@/components/ui';
+import { buildRoster, type RosterAudience, type RosterRow } from '@/lib/rosters/roster';
+import { money } from '@/lib/shared/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,23 +13,21 @@ interface SearchParams {
 }
 
 export default async function RostersPage({ searchParams }: { searchParams: SearchParams }) {
-  const providers = await repos.providers.list();
+  const { providers } = await getSnapshot();
   if (providers.length === 0) {
     return (
-      <Card>
-        <p className="text-sm text-slate-600">
-          No data yet. Seed and run the engine from the{' '}
-          <Link href="/" className="text-accent hover:underline">dashboard</Link>.
-        </p>
-      </Card>
+      <EmptyState
+        title="No data yet"
+        description="Seed synthetic data and run analytics from the dashboard first."
+        action={<ButtonLink href="/">Go to dashboard</ButtonLink>}
+      />
     );
   }
 
   const audience: RosterAudience = searchParams.audience === 'provider' ? 'provider' : 'payer';
   const npi =
     audience === 'provider'
-      ? searchParams.npi ??
-        [...providers].sort((a, b) => b.memberCount - a.memberCount)[0]?.npi
+      ? searchParams.npi ?? [...providers].sort((a, b) => b.memberCount - a.memberCount)[0]?.npi
       : undefined;
 
   const result = await buildRoster(audience, npi);
@@ -36,16 +36,53 @@ export default async function RostersPage({ searchParams }: { searchParams: Sear
       ? `/api/rosters?audience=provider&npi=${npi}&format=csv`
       : `/api/rosters?audience=payer&format=csv`;
 
+  const payerOnly = audience === 'payer';
+  const columns: Array<Column<RosterRow>> = [
+    {
+      key: 'member',
+      header: 'Member',
+      render: (r) => (
+        <>
+          {r.memberName}
+          <div className="font-mono text-xs font-normal text-slate-400">{r.memberId}</div>
+        </>
+      )
+    },
+    ...(payerOnly ? [{ key: 'pcp', header: 'PCP', className: 'text-xs', render: (r: RosterRow) => r.pcpName }] : []),
+    { key: 'gaps', header: 'Open gaps', className: 'text-xs', render: (r) => r.openGapMeasures },
+    { key: 'hcc', header: 'Suspected conditions', className: 'text-xs', render: (r) => r.suspectedHccs },
+    ...(payerOnly
+      ? [
+          { key: 'raf', header: 'RAF', align: 'right' as const, render: (r: RosterRow) => r.currentRaf.toFixed(3) },
+          {
+            key: 'opp',
+            header: '$ opp.',
+            align: 'right' as const,
+            render: (r: RosterRow) => (r.revenueOpportunity ? <span className="text-good">{money(r.revenueOpportunity)}</span> : '—')
+          }
+        ]
+      : []),
+    { key: 'action', header: 'Recommended action', className: 'text-xs', render: (r) => r.recommendedAction }
+  ];
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-ink">Rosters</h1>
-        <p className="mt-1 max-w-3xl text-sm text-slate-600">
-          Auto-generated actionable rosters from current gaps + suspected HCCs. The{' '}
-          <strong>payer</strong> view spans the whole population with revenue lens; the{' '}
-          <strong>provider</strong> view is a per-panel worklist without plan economics.
-        </p>
-      </div>
+      <PageHeader
+        icon={<ClipboardList size={24} strokeWidth={1.75} className="text-accent" aria-hidden />}
+        title="Actionable rosters"
+        description={
+          <>
+            Auto-generated from current gaps + suspected HCCs. The <strong>payer</strong> view spans the
+            whole population with a revenue lens; the <strong>provider</strong> view is a per-panel
+            worklist without plan economics.
+          </>
+        }
+        actions={
+          <ButtonLink href={csvHref} size="sm" icon={<Download size={14} aria-hidden />}>
+            Download CSV
+          </ButtonLink>
+        }
+      />
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1">
@@ -72,7 +109,7 @@ export default async function RostersPage({ searchParams }: { searchParams: Sear
             <input type="hidden" name="audience" value="provider" />
             <label className="flex flex-col gap-1">
               <span className="text-xs uppercase tracking-wide text-slate-500">Provider</span>
-              <select name="npi" defaultValue={npi} className="rounded border border-slate-300 px-2 py-1.5 text-sm">
+              <Select name="npi" defaultValue={npi} className="w-auto py-1.5">
                 {[...providers]
                   .sort((a, b) => b.memberCount - a.memberCount)
                   .map((p) => (
@@ -80,69 +117,32 @@ export default async function RostersPage({ searchParams }: { searchParams: Sear
                       {p.organizationName} ({p.memberCount})
                     </option>
                   ))}
-              </select>
+              </Select>
             </label>
-            <button type="submit" className="rounded border border-slate-300 px-3 py-1.5 text-sm">Switch</button>
+            <button type="submit" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Switch
+            </button>
           </form>
         )}
-
-        <a
-          href={csvHref}
-          className="ml-auto rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-        >
-          ↓ Download CSV
-        </a>
       </div>
 
       <Card>
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <span className="font-semibold text-ink">{result.scope}</span>{' '}
-            <Pill color={audience === 'payer' ? 'sky' : 'green'}>{audience} roster</Pill>
-          </div>
-          <div className="text-sm text-slate-500">{result.rowCount} actionable members</div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-slate-500">
-                <th className="py-2 pr-4">Member</th>
-                {audience === 'payer' && <th className="py-2 pr-4">PCP</th>}
-                <th className="py-2 pr-4">Open gaps</th>
-                <th className="py-2 pr-4">Suspected conditions</th>
-                {audience === 'payer' && <th className="py-2 pr-4">RAF</th>}
-                {audience === 'payer' && <th className="py-2 pr-4">$ opp.</th>}
-                <th className="py-2">Recommended action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {result.rows.slice(0, 200).map((r) => (
-                <tr key={r.memberId} className="border-b align-top last:border-0">
-                  <td className="py-2 pr-4">
-                    <div>{r.memberName}</div>
-                    <div className="text-xs text-slate-400">{r.memberId}</div>
-                  </td>
-                  {audience === 'payer' && <td className="py-2 pr-4 text-xs">{r.pcpName}</td>}
-                  <td className="py-2 pr-4 text-xs">{r.openGapMeasures}</td>
-                  <td className="py-2 pr-4 text-xs">{r.suspectedHccs}</td>
-                  {audience === 'payer' && <td className="py-2 pr-4 tabular-nums">{r.currentRaf.toFixed(3)}</td>}
-                  {audience === 'payer' && (
-                    <td className="py-2 pr-4 tabular-nums text-good">
-                      {r.revenueOpportunity ? `$${r.revenueOpportunity.toLocaleString()}` : '—'}
-                    </td>
-                  )}
-                  <td className="py-2 text-xs">{r.recommendedAction}</td>
-                </tr>
-              ))}
-              {result.rows.length === 0 && (
-                <tr><td colSpan={7} className="py-6 text-slate-500">No actionable members for this scope.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        {result.rows.length > 200 && (
-          <p className="mt-2 text-xs text-slate-500">Showing first 200 of {result.rowCount}. Full set in the CSV.</p>
-        )}
+        <CardHeader
+          title={
+            <>
+              {result.scope}{' '}
+              <Badge color={audience === 'payer' ? 'sky' : 'green'}>{audience} roster</Badge>
+            </>
+          }
+          action={<span className="text-sm text-slate-500">{result.rowCount} actionable members</span>}
+        />
+        <DataTable
+          columns={columns}
+          rows={result.rows}
+          rowKey={(r) => r.memberId}
+          limit={200}
+          empty={<EmptyState title="No actionable members for this scope" description="Every member in this panel is either fully closed or has no suspected conditions." />}
+        />
       </Card>
     </div>
   );

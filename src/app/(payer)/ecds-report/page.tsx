@@ -1,70 +1,89 @@
-import { repos, readSeedSummary } from '@/lib/data/repository';
-import { Card, TierBadge } from '@/components/ui';
+import { FileText } from 'lucide-react';
+import { getSnapshot } from '@/lib/data/snapshot';
+import { ButtonLink, Card, DataTable, EmptyState, PageHeader, TierBadge, type Column } from '@/components/ui';
+import { StackedBar, CHART } from '@/components/charts';
+import type { HedisResult } from '@/lib/data/types';
 
 export const dynamic = 'force-dynamic';
 
 export default async function EcdsReport() {
-  const [results, summary] = await Promise.all([repos.hedisResults.list(), readSeedSummary()]);
+  const { results, summary } = await getSnapshot();
   const my = summary?.measurementYear;
+
+  const columns: Array<Column<HedisResult>> = [
+    {
+      key: 'measure',
+      header: 'Measure',
+      render: (r) => (
+        <>
+          {r.measureName}
+          <div className="font-mono text-xs font-normal text-slate-500">{r.measureId}</div>
+        </>
+      )
+    },
+    { key: 'tier', header: 'Tier', render: (r) => <TierBadge tier={r.dataTier} /> },
+    { key: 'domain', header: 'Domain', className: 'text-xs', render: (r) => r.domain },
+    { key: 'eligible', header: 'Eligible', align: 'right', render: (r) => r.eligiblePopulation },
+    { key: 'excluded', header: 'Excluded', align: 'right', render: (r) => r.exclusions },
+    {
+      key: 'split',
+      header: 'Numerator split (claims vs clinical)',
+      className: 'min-w-[160px]',
+      render: (r) => (
+        <StackedBar
+          height={10}
+          legend={false}
+          segments={[
+            { label: 'Claims', value: r.numeratorFromClaims, color: CHART.good },
+            { label: 'Clinical', value: r.numeratorFromClinical, color: CHART.accent },
+            { label: 'Open', value: r.gapCount, color: CHART.track }
+          ]}
+        />
+      )
+    },
+    { key: 'claims', header: 'Claims', align: 'right', render: (r) => r.numeratorFromClaims },
+    { key: 'clinical', header: 'Clinical', align: 'right', render: (r) => r.numeratorFromClinical },
+    { key: 'gaps', header: 'Open gaps', align: 'right', render: (r) => <span className="text-bad">{r.gapCount}</span> },
+    { key: 'rate', header: 'Rate %', align: 'right', render: (r) => <span className="font-semibold">{r.rate.toFixed(1)}</span> }
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">ECDS Summary Report</h1>
-          <p className="text-sm text-slate-600 mt-1 max-w-3xl">
-            Illustrative preview of what NCQA IDSS submission data looks like. Rates by measure, with
-            the data-source breakdown (claims-only, clinical-data, document-based) that an ECDS
-            submission requires. Not a licensed IDSS export.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <a href="/api/ecds-report?format=csv" className="rounded bg-slate-900 px-3 py-1.5 text-xs font-medium text-white">Export CSV</a>
-          <a href="/api/ecds-report?format=json" className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700">Export JSON</a>
-        </div>
-      </div>
+      <PageHeader
+        icon={<FileText size={24} strokeWidth={1.75} className="text-accent" aria-hidden />}
+        title="ECDS report"
+        description={`Illustrative preview of NCQA IDSS submission data for measurement year ${my ?? '—'}: rates by measure with the claims-vs-clinical numerator split an ECDS submission requires. Not a licensed IDSS export.`}
+        actions={
+          <>
+            <ButtonLink href="/api/ecds-report?format=csv" variant="primary" size="sm">
+              Export CSV
+            </ButtonLink>
+            <ButtonLink href="/api/ecds-report?format=json" variant="secondary" size="sm">
+              Export JSON
+            </ButtonLink>
+          </>
+        }
+      />
 
       <Card>
-        <div className="text-sm text-slate-500">Measurement year: <span className="font-medium text-ink">{my ?? '—'}</span></div>
-      </Card>
-
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wide text-slate-500 border-b">
-                <th className="py-2 pr-4">Measure</th>
-                <th className="py-2 pr-4">Tier</th>
-                <th className="py-2 pr-4">Domain</th>
-                <th className="py-2 pr-4 text-right">Eligible</th>
-                <th className="py-2 pr-4 text-right">Excluded</th>
-                <th className="py-2 pr-4 text-right">Numerator (claims)</th>
-                <th className="py-2 pr-4 text-right">Numerator (clinical)</th>
-                <th className="py-2 pr-4 text-right">Open gaps</th>
-                <th className="py-2 text-right">Rate %</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((r) => (
-                <tr key={r.measureId} className="border-b last:border-0">
-                  <td className="py-2 pr-4">
-                    <div className="font-medium">{r.measureName}</div>
-                    <div className="text-xs text-slate-500">{r.measureId}</div>
-                  </td>
-                  <td className="py-2 pr-4"><TierBadge tier={r.dataTier} /></td>
-                  <td className="py-2 pr-4 text-xs">{r.domain}</td>
-                  <td className="py-2 pr-4 text-right">{r.eligiblePopulation}</td>
-                  <td className="py-2 pr-4 text-right">{r.exclusions}</td>
-                  <td className="py-2 pr-4 text-right text-good">{r.numeratorFromClaims}</td>
-                  <td className="py-2 pr-4 text-right text-accent">{r.numeratorFromClinical}</td>
-                  <td className="py-2 pr-4 text-right text-bad">{r.gapCount}</td>
-                  <td className="py-2 text-right font-semibold">{r.rate.toFixed(1)}</td>
-                </tr>
-              ))}
-              {results.length === 0 && <tr><td colSpan={9} className="py-6 text-slate-500">Run the engine first.</td></tr>}
-            </tbody>
-          </table>
+        <div className="mb-3 flex flex-wrap gap-4 text-xs text-slate-600">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: CHART.good }} aria-hidden /> Numerator from claims
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: CHART.accent }} aria-hidden /> Numerator from clinical data
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: CHART.track }} aria-hidden /> Open gaps
+          </span>
         </div>
+        <DataTable
+          columns={columns}
+          rows={results}
+          rowKey={(r) => r.measureId}
+          rowHref={(r) => `/measures/${r.measureId}`}
+          empty={<EmptyState title="No results yet" description="Seed and run analytics from the dashboard first." />}
+        />
       </Card>
     </div>
   );
